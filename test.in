@@ -1,0 +1,39 @@
+# Initialization
+units		lj	# units for molecular simulations
+dimension	3	# 3D
+boundary	p p p	# periodic boundary conditions so atoms stay in box
+atom_style	atomic	# atomic liquids, solids, metals
+
+# Setup simulation box
+region      simbox block 0 10 0 10 0 10		# create block in 3D
+create_box  2 simbox	# box with 2 atom types
+
+# Setup atoms
+mass        1 1.0	# mass for atom type 1
+mass        2 196.96657	# mass for atom type 2
+
+# Group atoms
+group	heavy type == 1
+
+# Setup lattice structure
+lattice     fcc 0.8442
+create_atoms 1 box
+
+lattice     fcc 0.8442 origin 0.5 0.5 0.5
+create_atoms 2 box
+
+# Force fields
+pair_style  lj/cut 2.5	# set cutoff distance
+pair_coeff  1 1 1.0 1.0 2.5
+pair_coeff  2 2 1.0 1.0 2.5
+pair_coeff  1 2 0.8 1.0 2.5
+
+velocity    heavy set 0.5 0.5 0.5
+
+# Output
+dump	1 all atom 100 dump.lammpstrj
+
+# Timestep operations (fixes)
+fix         1 all nve
+timestep    0.001
+run 1000

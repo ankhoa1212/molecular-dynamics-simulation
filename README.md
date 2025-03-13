@@ -6,3 +6,4 @@ This project uses LAMMPS to simulate molecular dynamics
 - [Light-Responsive Assembly](https://pubs.acs.org/doi/10.1021/acs.jpcb.4c02301)
 - [Molecular Dynamics Simulation of Active Particles Video](https://pubs.acs.org/doi/10.1021/acs.jpcb.4c02301)
 - [Molecular Dynamics Simulation of Active Particles](https://arxiv.org/abs/2102.10399)
+- [OVITO (for Visualization)](https://www.ovito.org/)

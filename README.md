@@ -1,5 +1,5 @@
 # molecular-dynamics-simulation
-This project uses LAMMPS to simulate molecular dynamics
+This project uses LAMMPS to simulate molecular dynamics.
 
 ## Resources
 - [LAMMPS Manual](https://docs.lammps.org/Manual.html)

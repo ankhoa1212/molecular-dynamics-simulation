@@ -1,5 +1,0 @@
-- can use cmake to build lammps
-- can use ovito for visualization
-- to set ENV variable for executable in Linux:
-EXECUTABLE_DIR=$PWD
-export PATH=$EXECUTABLE:$PATH

@@ -28,3 +28,9 @@ After modifying the file, run ```source ~/.bashrc``` to refresh bash shell and r
 #### Setup Ovito
 
 If on an old Linux Ubuntu version less than 22.04 that does not have ```qt.qpa.plugin 6.5.0``` may need to install ```libxcb-cursor0```
+
+## Docker Setup
+[Install](https://www.docker.com/get-started/) Docker.
+
+Pull docker image:
+```docker pull ankhoa1212/lammps_simulations:test ```

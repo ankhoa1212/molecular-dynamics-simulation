@@ -19,11 +19,9 @@ Use the following to set up env variables to run the ```lmp``` command (first na
 ```export PATH=$EXECUTABLE_DIR:$PATH```
 
 ### Permanent Environment Variable Setup
-Add the following to the ```~/.bashrc``` file (replace ```/path/to/dir``` with the path to the directory of the executable):
+Add the following to the ```~/.profile``` file (replace ```/path/to/dir``` with the path to the directory of the executable):
 
 ```export PATH=/path/to/dir:$PATH```
-
-After modifying the file, run ```source ~/.bashrc``` to refresh bash shell and register the changes.
 
 #### Setup Ovito
 

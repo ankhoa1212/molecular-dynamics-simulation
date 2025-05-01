@@ -1,5 +1,5 @@
 # Use the official Ubuntu base image
-FROM ubuntu:20.04
+FROM ubuntu:latest
 
 # Set environment variables to avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -23,19 +23,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /lammps
+# Create a shallow copy of LAMMPS repository by cloning only a subset of the git history
+RUN git clone -b release https://github.com/lammps/lammps.git --depth=1000
 
-# Clone the LAMMPS repository
-RUN git clone -b stable https://github.com/lammps/lammps.git .
+# Set the working directory
+WORKDIR /lammps/build
 
-# Create a build directory and compile LAMMPS
-RUN mkdir build && cd build && \
-    cmake ../cmake -D BUILD_MPI=no -D BUILD_OMP=yes -D CMAKE_INSTALL_PREFIX=/usr/local/lammps && \
-    make -j$(nproc) && make install
+# Compile LAMMPS using CMake
+RUN cmake ../cmake \
+    -D BUILD_MPI=no \
+    -D BUILD_OMP=yes \
+    -D CMAKE_INSTALL_PREFIX="/usr/local/lammps"
+
+# Compile in parallel and copy compiled files into installation location
+RUN make -j$(nproc) && \
+    make install
 
 # Add LAMMPS to PATH
 ENV PATH="/usr/local/lammps/bin:$PATH"
+
+# Set variable to turn on OpenMP support at runtime
+ENV OMP_NUM_THREADS=$(nproc)
 
 # Set default command to run LAMMPS
 CMD ["lmp", "-h"]

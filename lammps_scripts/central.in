@@ -1,0 +1,52 @@
+# LAMMPS Input Script: Set velocity to zero for atoms entering a center region
+
+# --- Initialization ---
+units lj          # Use Lennard-Jones units
+atom_style ellipsoid # For adding Brownian motion
+dimension 3       # 3D simulation
+boundary p p p    # Set boundary conditions
+
+# --- System Definition ---
+variable box_size equal 800
+variable half_box equal ${box_size}/2
+region box block 0 ${box_size} 0 ${box_size} -0.5 0.5 units box # Define simulation box boundaries
+create_box 1 box                     # Create the simulation box with 1 atom type
+
+create_atoms 1 random 10976 12345 NULL overlap 3.9 maxtry 50
+
+# Set ellipsoid shape to sphere (semi-axes lengths are the same)
+set type 1 shape 0.5 0.5 0.5
+
+set atom 1 mass 1.0                           # Set mass of atom type 1
+
+# --- Variables ---
+variable x_center equal ${half_box}         # x-coordinate of the center
+variable y_center equal ${half_box}         # y-coordinate of the center
+variable vel_scale equal 10              # Scaling factor for initial velocity magnitude (adjust if needed)
+
+# --- Interactions ---
+pair_style lj/cut 2.5
+pair_coeff 1 1 1.0 1.0 2.5
+
+# --- Initial Velocities --
+variable vx_init atom v_vel_scale*(${x_center}-x)
+variable vy_init atom v_vel_scale*(${y_center}-y)
+# Add the calculated velocities to all atoms
+velocity all set v_vx_init v_vy_init 0.0 sum yes
+
+# --- Integration ---
+fix 1 all nve
+fix 2 all langevin 0.1 0.1 0.1 48279 angmom 3.333
+
+# --- Simulation Settings ---
+timestep 0.0001 # Timestep for integration (in lj time units) - Keep it small for stability
+thermo 100     # Output thermodynamic info
+thermo_style custom step temp pe ke etotal press vol atoms
+
+# --- Output ---
+# Dump atom positions, velocities, and forces every 100 steps to log.lammpstrj file
+dump 1 all custom 100 log.lammpstrj id type x y vx vy fx fy
+
+# --- Run Simulation ---
+# Run for N steps
+run 10000

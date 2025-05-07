@@ -42,8 +42,5 @@ RUN make -j$(nproc) && \
 # Add LAMMPS to PATH
 ENV PATH="/usr/local/lammps/bin:$PATH"
 
-# Set variable to turn on OpenMP support at runtime
-ENV OMP_NUM_THREADS=$(nproc)
-
 # Set default command to run LAMMPS
 CMD ["lmp", "-h"]

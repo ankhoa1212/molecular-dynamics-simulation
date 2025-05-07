@@ -37,4 +37,6 @@ If on an old Linux Ubuntu version less than 22.04 that does not have ```qt.qpa.p
 [Install](https://www.docker.com/get-started/) Docker.
 
 Pull docker image:
-```docker pull ankhoa1212/lammps_simulations:test ```
+```
+docker pull ankhoa1212/lammps-simulations:latest
+```

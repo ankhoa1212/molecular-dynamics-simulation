@@ -45,7 +45,7 @@ thermo_style custom step temp pe ke etotal press vol atoms
 
 # --- Output ---
 # Dump atom positions, velocities, and forces every 100 steps to log.lammpstrj file
-dump 1 all custom 100 log.lammpstrj id type x y vx vy fx fy
+dump 1 all custom 100 ${filename}.lammpstrj id type x y vx vy fx fy
 
 # --- Run Simulation ---
 # Run for N steps

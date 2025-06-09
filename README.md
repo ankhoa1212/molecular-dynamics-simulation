@@ -12,16 +12,22 @@ This project uses LAMMPS to simulate molecular dynamics.
 [Install](https://docs.lammps.org/Install.html) and [Build](https://docs.lammps.org/Build.html) LAMMPS.
 
 ### Temporary Environment Variable Setup
-Use the following to set up env variables to run the ```lmp``` command (first navigate to the directory of the executable):
+Use the following to set up env variables in the commandline to run the ```lmp``` command (first navigate to the directory of the executable):
 
-```EXECUTABLE_DIR=$PWD```
+```
+EXECUTABLE_DIR=$PWD
+```
 
-```export PATH=$EXECUTABLE_DIR:$PATH```
+```
+export PATH=$EXECUTABLE_DIR:$PATH
+```
 
-### Permanent Environment Variable Setup
-Add the following to the ```~/.profile``` file (replace ```/path/to/dir``` with the path to the directory of the executable):
+### Bash Shell Environment Variable Setup
+Add the following to the ```~/.bashrc``` file (replace ```/path/to/dir``` with the path to the directory of the executable):
 
-```export PATH=/path/to/dir:$PATH```
+```
+export PATH=/path/to/dir:$PATH
+```
 
 #### Setup Ovito
 
@@ -31,4 +37,6 @@ If on an old Linux Ubuntu version less than 22.04 that does not have ```qt.qpa.p
 [Install](https://www.docker.com/get-started/) Docker.
 
 Pull docker image:
-```docker pull ankhoa1212/lammps_simulations:test ```
+```
+docker pull ankhoa1212/lammps-simulations:latest
+```

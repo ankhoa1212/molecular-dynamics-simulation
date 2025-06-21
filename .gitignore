@@ -2,4 +2,4 @@ log.lammps
 venv/
 output/
 testing/
-
+*.csv

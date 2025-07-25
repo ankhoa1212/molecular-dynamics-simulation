@@ -1,13 +1,6 @@
 # molecular-dynamics-simulation
 This project uses LAMMPS to simulate molecular dynamics.
 
-## Resources
-- [LAMMPS Manual](https://docs.lammps.org/Manual.html)
-- [Light-Responsive Assembly](https://pubs.acs.org/doi/10.1021/acs.jpcb.4c02301)
-- [Molecular Dynamics Simulation of Active Particles Video](https://pubs.acs.org/doi/10.1021/acs.jpcb.4c02301)
-- [Molecular Dynamics Simulation of Active Particles](https://arxiv.org/abs/2102.10399)
-- [OVITO (for Visualization)](https://www.ovito.org/)
-
 ## Linux Setup
 [Install](https://docs.lammps.org/Install.html) and [Build](https://docs.lammps.org/Build.html) LAMMPS.
 
@@ -40,3 +33,15 @@ Pull docker image:
 ```
 docker pull ankhoa1212/lammps-simulations:latest
 ```
+
+## Resources
+- [LAMMPS Manual](https://docs.lammps.org/Manual.html)
+  - [Installation](https://docs.lammps.org/Install.html)
+  - [Examples](https://docs.lammps.org/Examples.html)
+  - [Processing Tools](https://docs.lammps.org/Tools.html)
+  - [Library Interfaces](https://docs.lammps.org/Library.html)
+  - [Modifying and extending LAMMPS](https://docs.lammps.org/Modify.html)
+- [Light-Responsive Assembly](https://pubs.acs.org/doi/10.1021/acs.jpcb.4c02301)
+- [Molecular Dynamics Simulation of Active Particles Video](https://www.youtube.com/watch?v=wsM2kUB6XU4&ab_channel=SoftMatterLab)
+- [Molecular Dynamics Simulation of Active Particles (Brownian Motion)](https://arxiv.org/abs/2102.10399)
+- [OVITO (for Visualization)](https://www.ovito.org/)

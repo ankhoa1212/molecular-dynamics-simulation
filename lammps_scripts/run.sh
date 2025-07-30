@@ -34,7 +34,7 @@ fi
 if [ "$#" -eq 2 ]; then
     OUTPUT_DIR="$2"
 else
-    OUTPUT_DIR="output"
+    OUTPUT_DIR="results"
 fi
 
 # The input script is the first argument passed to the script.

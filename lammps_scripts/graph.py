@@ -3,8 +3,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sys
-import mdtraj as md
+# import mdtraj as md
 import os
+
+def check_is_float(value):
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
+    
+def check_is_int(value):
+    try:
+        int(value)
+        return True
+    except ValueError:
+        return False
 
 def generate_csv(filename, csv_filename):
     print(f"Opening file {filename}...")
@@ -20,10 +34,12 @@ def generate_csv(filename, csv_filename):
                     read_time = True
                     read_data = False
                 elif line.startswith('ITEM: ATOMS'):
+                    # set values to column names, skip the first 12 characters "ITEM: ATOMS ""
                     if not values:
                         values = line[12:].split()
                         values.append('timestep')
                         data = pd.DataFrame(columns=values)
+                        print(values)
                     read_data = True
                 continue
             if read_time:
@@ -34,9 +50,16 @@ def generate_csv(filename, csv_filename):
             elif read_data:
                 input_line = line.split()
                 input_line.append(timestep)
-                temp = [float(x) if i > 1 and i < 8 else int(x) for i,x in enumerate(input_line)]
-                print(f"Adding data at timestep {timestep}: {len(temp)} {temp}")
-                data.loc[len(data)] = temp
+                temp_data = []
+                for value in input_line:
+                    if check_is_float(value):
+                        temp_data.append(float(value))
+                    elif check_is_int(value):
+                        temp_data.append(int(value))
+                    else:
+                        temp_data.append(value)
+                print(f"Adding data at timestep {timestep}: {len(temp_data)} {temp_data}")
+                data.loc[len(data)] = temp_data
 
         # Save the dataframe to a CSV file
         data.to_csv(csv_filename, index=False)

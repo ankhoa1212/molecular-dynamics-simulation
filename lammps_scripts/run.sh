@@ -111,7 +111,7 @@ echo ""
 echo "=========================================="
 echo "LAMMPS simulation finished."
 echo "Check the log file '$LOG_FILE' for details."
-echo "Run the trajectory file '$OUTPUT_DIR/${INPUT_SCRIPT}_${MOLECULES}_${VAR_EPSILON}.lammpstrj' with ovito for visualization"
+echo "Run the trajectory file with ovito: ovito '$OUTPUT_DIR/${INPUT_SCRIPT}_${MOLECULES}_${VAR_EPSILON}.lammpstrj' for visualization"
 echo "=========================================="
 
 # --- Post-processing ---

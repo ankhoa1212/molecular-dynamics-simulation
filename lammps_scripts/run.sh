@@ -88,7 +88,7 @@ echo "=========================================="
 # Run the LAMMPS simulation.
 # The '-in' flag specifies the input script.
 # The '-log' flag specifies the output log file.
-# The '-var' flag allows passing a variable into the input script
+# The '-var' flag allows passing a variable into the LAMMPS input script
 for (( m=$MOLECULES; m<=${MOLECULES_END:-$MOLECULES}; m+=${MOLECULES_STEP:-1} )); do
   for (( e=$(printf "%.0f" "${VAR_EPSILON}"); e<=$(printf "%.0f" "${VAR_EPSILON_END:-$VAR_EPSILON}"); e+=$(printf "%.0f" "${VAR_EPSILON_STEP:-1}") )); do
     EPSILON_VAL=$(printf "%.1f" "$e")

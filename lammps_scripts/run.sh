@@ -3,8 +3,6 @@
 # ==============================================================================
 # A bash script to run a LAMMPS simulation using a filename provided as a
 # command-line argument.
-#
-# Usage: ./run_lammps.sh <input_file> [output_directory]
 
 # Set the name of the LAMMPS executable.
 LAMMPS_EXECUTABLE="lmp"
@@ -25,8 +23,6 @@ echo "Setting OMP_NUM_THREADS to $OMP_NUM_THREADS"
 
 # Set default values for optional arguments
 OUTPUT_DIR="results"
-MOLECULES="1000"
-VAR_EPSILON="5.0"
 MOLECULES="1000"
 MOLECULES_END="$MOLECULES"
 MOLECULES_STEP="1"

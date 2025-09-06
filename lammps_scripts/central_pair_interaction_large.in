@@ -11,10 +11,10 @@ variable box_size equal 200
 variable half_box equal ${box_size}/2
 region box block 0 ${box_size} 0 ${box_size} -0.5 0.5 units box # Define simulation box boundaries
 create_box 1 box                # create the simulation box with 1 atom type
-create_atoms 1 random 1000 12345 NULL overlap 3.9 maxtry 50
+create_atoms 1 random ${molecules} 12345 NULL overlap 3.9 maxtry 50
 
 # --- Define the variables for lj/expand ---
-variable	epsilon equal 5.0	# energy (strength of attraction between particles)
+variable	epsilon equal ${var_epsilon}	# energy (strength of attraction between particles)
 variable	sigma equal 1.0     # distance where particles bond (potential energy is 0)
 variable	delta equal 0.0     # radius difference between particles (for lj/expand)
 variable	cutoff equal 2.0	# cutoff distance (particles farther than this value have the interaction ignored)
@@ -50,7 +50,7 @@ thermo_style custom step temp pe ke etotal press vol atoms  # Added 'atoms' to c
 
 # --- Output ---
 # dump atom positions and velocities every 100 steps to a .lammpstrj file
-dump 1 all custom 100 central_pair_interaction_large.in.lammpstrj id type x y vx vy fx fy v_dist
+dump 1 all custom 100 ${filename}.lammpstrj id type x y vx vy fx fy v_dist
 
 # --- Run Simulation ---
 run 25000

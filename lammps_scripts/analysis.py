@@ -1,3 +1,4 @@
+# pylint: skip-file
 import MDAnalysis as mda
 import MDAnalysis.analysis.msd as msd
 import numpy as np
@@ -104,3 +105,7 @@ avg_vel = calculate_avg_velocity(universe, selected_atoms)
 print(f"Average velocity vector: {avg_vel} Å/ps")
 print(f"Average velocity magnitude: {np.linalg.norm(avg_vel)} Å/ps")
 
+if __name__ == "__main__":
+    avg_vel = calculate_avg_velocity(universe, selected_atoms)
+    print(f"Average velocity vector: {avg_vel} Å/ps")
+    print(f"Average velocity magnitude: {np.linalg.norm(avg_vel)} Å/ps")

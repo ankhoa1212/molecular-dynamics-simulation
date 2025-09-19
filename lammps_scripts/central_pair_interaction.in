@@ -53,4 +53,4 @@ thermo_style custom step temp pe ke etotal press vol atoms  # Added 'atoms' to c
 dump 1 all custom 100 ${filename}.lammpstrj id type x y vx vy fx fy v_dist
 
 # --- Run Simulation ---
-run 10000
+run 15000

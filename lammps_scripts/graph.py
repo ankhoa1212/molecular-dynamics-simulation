@@ -19,8 +19,8 @@ Script Usage:
 """
 import os
 import sys
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
 # import mdtraj as md
 
@@ -45,6 +45,7 @@ def generate_csv(filename, csv_filename):
     """ Generate a CSV file from a LAMMPS dump file """
     print(f"Opening file {filename}...")
     read_data, read_time = False, False
+    data = pd.DataFrame()
     with open(filename, "r") as file:
         lines = file.readlines()
         print(f"Reading data from {filename}...")
@@ -63,6 +64,7 @@ def generate_csv(filename, csv_filename):
                         data = pd.DataFrame(columns=values)
                         print(values)
                     read_data = True
+                continue
             if read_time:
                 timestep = line
                 read_time = False
@@ -86,6 +88,7 @@ def generate_csv(filename, csv_filename):
         # Save the dataframe to a CSV file
         data.to_csv(csv_filename, index=False)
         print(f"Data saved to {csv_filename}")
+        return data
 
 def read_data_from_file():
     """ Read data from a file or generate a CSV if it doesn't exist """
@@ -100,11 +103,11 @@ def read_data_from_file():
 
     csv_file = filename.rsplit(".", 1)[0] + ".csv"
     if os.path.exists(csv_file):
-        print(f"CSV file {csv_file} already exists.")
+        print(f"CSV file {csv_file} found.")
         print("Reading in csv data...")
         data = pd.read_csv(csv_file)
     else:
-        generate_csv(filename, csv_file)
+        data = generate_csv(filename, csv_file)
     return data, filename
 
 def create_plots(data, filename):

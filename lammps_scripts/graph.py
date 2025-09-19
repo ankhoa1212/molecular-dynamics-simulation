@@ -1,19 +1,40 @@
-# Create scatter plot of nodes
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import sys
-# import mdtraj as md
+"""
+graph.py
+This module processes molecular dynamics simulation output files (LAMMPS dump format),
+extracts atomic data, and generates a CSV file for further analysis. It also provides
+visualization of the average velocity magnitude per timestep using matplotlib.
+Functions:
+    check_is_float(value):
+        Checks if the given value can be converted to a float.
+    check_is_int(value):
+        Checks if the given value can be converted to an integer.
+    generate_csv(filename, csv_filename):
+        Reads a LAMMPS dump file, extracts atomic data for each timestep,
+        and saves it as a CSV file with appropriate columns.
+Script Usage:
+    python graph.py <filename>
+        - If a corresponding CSV file does not exist, it will be generated from the raw file.
+        - If the CSV exists, it will be loaded for analysis.
+        - The script computes and plots the average velocity magnitude ('vx', 'vy') per timestep.
+"""
 import os
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+# import mdtraj as md
+
 
 def check_is_float(value):
+    """ Check if a value is a float """
     try:
         float(value)
         return True
     except ValueError:
         return False
-    
+
 def check_is_int(value):
+    """ Check if a value is an integer """
     try:
         int(value)
         return True
@@ -21,23 +42,25 @@ def check_is_int(value):
         return False
 
 def generate_csv(filename, csv_filename):
+    """ Generate a CSV file from a LAMMPS dump file """
     print(f"Opening file {filename}...")
-    with open(filename, 'r') as f:
-        lines = f.readlines()
+    read_data, read_time = False, False
+    data = pd.DataFrame()
+    with open(filename, "r") as file:
+        lines = file.readlines()
         print(f"Reading data from {filename}...")
-        read_data, read_time = False, False
         values = None
         timestep = None
         for line in lines:
-            if line.startswith('ITEM:'):
-                if line.startswith('ITEM: TIMESTEP'):
+            if line.startswith("ITEM:"):
+                if line.startswith("ITEM: TIMESTEP"):
                     read_time = True
                     read_data = False
-                elif line.startswith('ITEM: ATOMS'):
+                elif line.startswith("ITEM: ATOMS"):
                     # set values to column names, skip the first 12 characters "ITEM: ATOMS ""
                     if not values:
                         values = line[12:].split()
-                        values.append('timestep')
+                        values.append("timestep")
                         data = pd.DataFrame(columns=values)
                         print(values)
                     read_data = True
@@ -46,7 +69,6 @@ def generate_csv(filename, csv_filename):
                 timestep = line
                 read_time = False
                 print(f"timestep: {timestep}")
-                continue
             elif read_data:
                 input_line = line.split()
                 input_line.append(timestep)
@@ -58,40 +80,56 @@ def generate_csv(filename, csv_filename):
                         temp_data.append(int(value))
                     else:
                         temp_data.append(value)
-                print(f"Adding data at timestep {timestep}: {len(temp_data)} {temp_data}")
+                print(
+                    f"Adding data at timestep {timestep}: {len(temp_data)} {temp_data}"
+                )
                 data.loc[len(data)] = temp_data
 
         # Save the dataframe to a CSV file
         data.to_csv(csv_filename, index=False)
         print(f"Data saved to {csv_filename}")
+        return data
 
-# Read data from a raw file
-if len(sys.argv) < 2:
-    print("Usage: python graph.py <filename>")
-    sys.exit(1)
+def read_data_from_file():
+    """ Read data from a file or generate a CSV if it doesn't exist """
+    # Read data from a raw file
+    if len(sys.argv) < 2:
+        print("Usage: python graph.py <filename>")
+        sys.exit(1)
 
-filename = sys.argv[1]
+    filename = sys.argv[1]
 
-data = pd.DataFrame()
+    data = pd.DataFrame()
 
-csv_file = filename.rsplit('.', 1)[0] + '.csv'
-if os.path.exists(csv_file):
-    print(f"CSV file {csv_file} already exists.")
-    print("Reading in csv data...")
-    data = pd.read_csv(csv_file)
-else:
-    generate_csv(filename, csv_file)
+    csv_file = filename.rsplit(".", 1)[0] + ".csv"
+    if os.path.exists(csv_file):
+        print(f"CSV file {csv_file} found.")
+        print("Reading in csv data...")
+        data = pd.read_csv(csv_file)
+    else:
+        data = generate_csv(filename, csv_file)
+    return data, filename
 
-print("Creating plots...")
-if 'vx' in data.columns and 'vy' in data.columns and 'timestep' in data.columns:
-    data['v_mag'] = np.sqrt(data['vx']**2 + data['vy']**2)
-    avg_vmag = data.groupby('timestep')['v_mag'].mean()
-    plt.figure()
-    plt.plot(avg_vmag.index, avg_vmag.values, marker='o')
-    plt.xlabel('Timestep')
-    plt.ylabel('Average Velocity Magnitude')
-    plt.title('Average Velocity Magnitude per Timestep')
-    plt.savefig(filename.rsplit('.', 1)[0] + '_avg_velocity_magnitude.png')
-    plt.show()
-else:
-    print("Required columns ('vx', 'vy', 'timestep') not found in data.")
+def create_plots(data, filename):
+    """ Create plots from the data """
+    print("Creating plots...")
+    if "vx" in data.columns and "vy" in data.columns and "timestep" in data.columns:
+        data["v_mag"] = np.sqrt(data["vx"] ** 2 + data["vy"] ** 2)
+        avg_vmag = data.groupby("timestep")["v_mag"].mean()
+        plt.figure()
+        plt.plot(avg_vmag.index, avg_vmag.values, marker="o")
+        plt.xlabel("Timestep")
+        plt.ylabel("Average Velocity Magnitude")
+        plt.title("Average Velocity Magnitude per Timestep")
+        plt.savefig(filename.rsplit(".", 1)[0] + "_avg_velocity_magnitude.png")
+        plt.show()
+    else:
+        print("Required columns ('vx', 'vy', 'timestep') not found in data.")
+
+def main():
+    """ Main function to execute the script """
+    data, filename = read_data_from_file()
+    create_plots(data, filename)
+
+if __name__ == "__main__":
+    main()

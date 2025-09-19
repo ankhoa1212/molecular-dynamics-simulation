@@ -3,8 +3,6 @@
 # ==============================================================================
 # A bash script to run a LAMMPS simulation using a filename provided as a
 # command-line argument.
-#
-# Usage: ./run_lammps.sh <input_file> [output_directory]
 
 # Set the name of the LAMMPS executable.
 LAMMPS_EXECUTABLE="lmp"
@@ -25,8 +23,6 @@ echo "Setting OMP_NUM_THREADS to $OMP_NUM_THREADS"
 
 # Set default values for optional arguments
 OUTPUT_DIR="results"
-MOLECULES="1000"
-VAR_EPSILON="5.0"
 MOLECULES="1000"
 MOLECULES_END="$MOLECULES"
 MOLECULES_STEP="1"
@@ -92,7 +88,7 @@ echo "=========================================="
 # Run the LAMMPS simulation.
 # The '-in' flag specifies the input script.
 # The '-log' flag specifies the output log file.
-# The '-var' flag allows passing a variable into the input script
+# The '-var' flag allows passing a variable into the LAMMPS input script
 for (( m=$MOLECULES; m<=${MOLECULES_END:-$MOLECULES}; m+=${MOLECULES_STEP:-1} )); do
   for (( e=$(printf "%.0f" "${VAR_EPSILON}"); e<=$(printf "%.0f" "${VAR_EPSILON_END:-$VAR_EPSILON}"); e+=$(printf "%.0f" "${VAR_EPSILON_STEP:-1}") )); do
     EPSILON_VAL=$(printf "%.1f" "$e")
@@ -115,7 +111,7 @@ echo ""
 echo "=========================================="
 echo "LAMMPS simulation finished."
 echo "Check the log file '$LOG_FILE' for details."
-echo "Run the trajectory file '$OUTPUT_DIR/${INPUT_SCRIPT}_${MOLECULES}_${VAR_EPSILON}.lammpstrj' with ovito for visualization"
+echo "Run the trajectory file with ovito: ovito '$OUTPUT_DIR/${INPUT_SCRIPT}_${MOLECULES}_${VAR_EPSILON}.lammpstrj' for visualization"
 echo "=========================================="
 
 # --- Post-processing ---

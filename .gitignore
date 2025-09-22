@@ -4,3 +4,4 @@ output/
 tests/
 *.csv
 data/
+__pycache__/

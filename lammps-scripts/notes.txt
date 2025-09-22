@@ -1,2 +1,0 @@
-verify simulation -> is velocity position dependent?
-run w/ 2 diff particle sizes

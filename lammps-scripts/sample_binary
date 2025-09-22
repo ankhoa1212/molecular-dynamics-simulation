@@ -1,0 +1,44 @@
+units		lj
+dimension	2
+
+boundary 	p p p
+atom_style 	full
+
+variable	epsilon equal 5.0
+variable	epsilon2 equal 5.68
+variable	avgepsilon equal 5.34 
+variable	delta1 equal 4.45
+variable	sigma equal 0.1
+variable	delta2 equal 5.08
+variable	cutoff equal 15.0
+variable	avgdelta equal 4.77
+
+
+region		box block 0 800 0 800 -0.5 0.5
+create_box	2 box
+create_atoms    1 random 10976 12345 NULL overlap 3.9 maxtry 50
+create_atoms    2 random 11460 23487 NULL overlap 3.9 maxtry 50
+
+mass 1 1.0
+mass 2 1.0
+
+pair_style lj/expand ${cutoff}
+pair_coeff 1 1 ${epsilon} ${delta1} ${sigma} ${cutoff}
+pair_coeff 2 2 ${epsilon2} ${delta2} ${sigma} ${cutoff}
+pair_coeff 1 2  ${avgepsilon} ${avgdelta} ${sigma} ${cutoff}
+
+
+fix 1 all enforce2d
+fix 2 all nve
+fix 3 all langevin 5.0 0.1 1.0 123456
+
+
+timestep 0.001
+
+thermo_style custom time step temp pe ke etotal
+thermo 5000
+
+
+dump 1 all custom 5000 trajectory3_d88_s10_e5_3.dump id type x y z
+	     
+run 500000

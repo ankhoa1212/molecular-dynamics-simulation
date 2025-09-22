@@ -1,8 +1,8 @@
 import sys
 import argparse
-import processing
-import training
-import evaluation
+import process
+import train
+import evaluate
 
 def main():
     parser = argparse.ArgumentParser(description="Molecular Dynamics ML Pipeline")
@@ -11,11 +11,11 @@ def main():
     args = parser.parse_args()
 
     if args.stage == 'process':
-        processing.run(args.config)
+        process.run(args.config)
     elif args.stage == 'train':
-        training.run(args.config)
+        train.run(args.config)
     elif args.stage == 'evaluate':
-        evaluation.run(args.config)
+        evaluate.run(args.config)
     else:
         print("Unknown stage.")
         sys.exit(1)

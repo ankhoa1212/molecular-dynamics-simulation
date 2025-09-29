@@ -1,0 +1,7 @@
+[project]
+name = "machine-learning"
+version = "0.2.0"
+description = "machine learning for particle tracking"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []

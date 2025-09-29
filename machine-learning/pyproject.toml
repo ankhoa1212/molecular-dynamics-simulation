@@ -1,11 +1,7 @@
 [project]
 name = "machine-learning"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "machine learning for particle tracking"
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "scikit-learn>=1.7.2",
-    "torch>=2.8.0",
-    "ultralytics>=8.3.203",
-]
+requires-python = ">=3.11"
+dependencies = []

@@ -1,5 +1,5 @@
 import os
-from ultralytics import YOLO
+from yolov12.ultralytics import YOLO
 
 def main():
     # Path to your dataset

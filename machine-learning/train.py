@@ -6,7 +6,7 @@ def main():
     data_yaml = os.path.join(os.path.dirname(__file__), 'data', 'data.yaml')
 
     # Create YOLOv12 model instance
-    model = YOLO('yolov12n-cls.pt')
+    model = YOLO('yolov11n-cls.pt')
 
     # Ensure the output directory exists
     output_dir = os.path.join(os.path.dirname(__file__), 'runs', 'train')
@@ -27,14 +27,14 @@ def main():
             imgsz=640,
             batch=16,
             project=output_dir,
-            name='yolov12n-custom',
+            name='yolov11n-custom',
             task='detect'
         )
     except Exception as e:
         print(f"An error occurred during training: {e}")
     # # Save the trained model
     # model.export(format='pt', imgsz=640)
-    # model.save(os.path.join(output_dir, 'yolov12n-custom.pt')))
+    # model.save(os.path.join(output_dir, 'yolov11n-custom.pt')))
 if __name__ == "__main__":
     try:
         main()

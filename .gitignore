@@ -3,6 +3,5 @@ venv/
 output/
 tests/
 *.csv
-data/
 **/__pycache__/
 __pycache__/

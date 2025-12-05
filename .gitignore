@@ -1,5 +1,8 @@
 log.lammps
 venv/
 output/
-testing/
+tests/
+data/
 *.csv
+**/__pycache__/
+__pycache__/

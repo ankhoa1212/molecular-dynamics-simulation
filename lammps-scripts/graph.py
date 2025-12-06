@@ -46,7 +46,7 @@ def generate_csv(filename, csv_filename):
     print(f"Opening file {filename}...")
     read_data, read_time = False, False
     data = pd.DataFrame()
-    with open(filename, "r") as file:
+    with open(filename, "r", encoding="utf-8") as file:
         lines = file.readlines()
         print(f"Reading data from {filename}...")
         values = None

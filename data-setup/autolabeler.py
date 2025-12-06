@@ -13,6 +13,17 @@ from PIL import Image, ImageDraw
 from ultralytics import YOLO
 
 
+def _generate_yolo_labels_for_image(model, image_path, label_file):
+    """Generate YOLO labels for a single image using the provided model."""
+    with open(label_file, "w", encoding="utf-8") as file:
+        for result in model.predict(image_path, save=True, verbose=True):
+            for box in result.boxes:
+                x_center, y_center, w, h = box.xywhn[0].tolist()
+                file.write(
+                    f"{int(box.cls[0])} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}\n"
+                )
+
+
 def generate_yolo_labels(input_path, output_label_folder, model_path="yolov8m.pt"):
     """Generate YOLO-format labels for images using a pre-trained YOLO model."""
     model = YOLO(model_path)
@@ -36,13 +47,20 @@ def generate_yolo_labels(input_path, output_label_folder, model_path="yolov8m.pt
 
     for i, fp in enumerate(files):
         label_file = os.path.join(output_label_folder, f"frame_{i:05d}.txt")
-        with open(label_file, "w", encoding="utf-8") as file:
-            for result in model.predict(fp, save=True, verbose=True):
-                for box in result.boxes:
-                    x_center, y_center, w, h = box.xywhn[0].tolist()
-                    file.write(
-                        f"{int(box.cls[0])} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}\n"
-                    )
+        _generate_yolo_labels_for_image(model, fp, label_file)
+
+
+def _generate_pseudo_labels_for_image(
+    group, label_file, img_width, img_height, box_size
+):
+    """Generate YOLO-format pseudo-labels for a single image based on trackpy output."""
+    with open(label_file, "w", encoding="utf-8") as file:
+        for _, row in group.iterrows():
+            x_center = row["x"] / img_width
+            y_center = row["y"] / img_height
+            w = box_size / img_width
+            h = box_size / img_height
+            file.write(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}\n")
 
 
 def generate_pseudo_labels(
@@ -74,13 +92,41 @@ def generate_pseudo_labels(
 
     for frame_id, group in f.groupby("frame"):
         label_file = os.path.join(output_label_folder, f"frame_{int(frame_id):05d}.txt")
-        with open(label_file, "w", encoding="utf-8") as file:
-            for _, row in group.iterrows():
-                x_center = row["x"] / img_width
-                y_center = row["y"] / img_height
-                w = box_size / img_width
-                h = box_size / img_height
-                file.write(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}\n")
+        _generate_pseudo_labels_for_image(
+            group, label_file, img_width, img_height, box_size
+        )
+
+
+def _overlay_labels(label_file, img):
+    """Overlay bounding boxes from YOLO-format label file onto the given image."""
+    with open(label_file, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+    draw = ImageDraw.Draw(img)
+    for line in lines:
+        parts = line.strip().split()
+        if len(parts) == 5:
+            _, x_c, y_c, ww, hh = map(float, parts)
+            iw, ih = img.size
+            draw.rectangle(
+                [
+                    (x_c - ww / 2) * iw,
+                    (y_c - hh / 2) * ih,
+                    (x_c + ww / 2) * iw,
+                    (y_c + hh / 2) * ih,
+                ],
+                outline="red",
+                width=2,
+            )
+
+
+def _save_label_overlay(i, image_path, label_folder, output_path):
+    """Load an image, overlay labels, and save the result."""
+    img = Image.open(image_path).convert("RGB")
+    label_file = os.path.join(label_folder, f"frame_{i:05d}.txt")
+    if os.path.exists(label_file):
+        _overlay_labels(label_file, img)
+    overlay_fp = os.path.join(output_path, f"frame_{i:05d}_overlay.png")
+    img.save(overlay_fp)
 
 
 def overlay_labels_on_images(input_path, output_label_folder, output_overlay_folder):
@@ -97,24 +143,7 @@ def overlay_labels_on_images(input_path, output_label_folder, output_overlay_fol
     os.makedirs(output_overlay_folder, exist_ok=True)
 
     for i, fp in enumerate(files):
-        img = Image.open(fp).convert("RGB")
-        label_file = os.path.join(output_label_folder, f"frame_{i:05d}.txt")
-        if os.path.exists(label_file):
-            with open(label_file, "r", encoding="utf-8") as file:
-                lines = file.readlines()
-            draw = ImageDraw.Draw(img)
-            for line in lines:
-                parts = line.strip().split()
-                if len(parts) == 5:
-                    _, x_c, y_c, ww, hh = map(float, parts)
-                    iw, ih = img.size
-                    x1 = (x_c - ww / 2) * iw
-                    y1 = (y_c - hh / 2) * ih
-                    x2 = (x_c + ww / 2) * iw
-                    y2 = (y_c + hh / 2) * ih
-                    draw.rectangle([x1, y1, x2, y2], outline="red", width=2)
-        overlay_fp = os.path.join(output_overlay_folder, f"frame_{i:05d}_overlay.png")
-        img.save(overlay_fp)
+        _save_label_overlay(i, fp, output_label_folder, output_overlay_folder)
 
 
 INPUT_PATH = (

@@ -6,10 +6,10 @@ via particle tracking, and overlay bounding boxes on images for visualization.
 """
 
 import os
-import trackpy as tp
 
-from PIL import Image, ImageDraw
 import numpy as np
+import trackpy as tp
+from PIL import Image, ImageDraw
 from ultralytics import YOLO
 
 
@@ -35,15 +35,14 @@ def generate_yolo_labels(input_path, output_label_folder, model_path="yolov8m.pt
     os.makedirs(output_label_folder, exist_ok=True)
 
     for i, fp in enumerate(files):
-        results = model.predict(fp, save=True, verbose=True)
         label_file = os.path.join(output_label_folder, f"frame_{i:05d}.txt")
         with open(label_file, "w", encoding="utf-8") as file:
-            for result in results:
-                boxes = result.boxes
-                for box in boxes:
-                    cls = int(box.cls[0])
+            for result in model.predict(fp, save=True, verbose=True):
+                for box in result.boxes:
                     x_center, y_center, w, h = box.xywhn[0].tolist()
-                    file.write(f"{cls} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}\n")
+                    file.write(
+                        f"{int(box.cls[0])} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}\n"
+                    )
 
 
 def generate_pseudo_labels(

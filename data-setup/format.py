@@ -2,9 +2,10 @@
 
 import argparse
 import os
-import tifffile
+
 import cv2
 import numpy as np
+import tifffile
 
 
 def convert_tif_to_frames(input_path, output_folder, image_format="png", nth=10):

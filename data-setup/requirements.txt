@@ -1,0 +1,6 @@
+tifffile
+opencv-python
+numpy
+pillow
+pandas
+trackpy

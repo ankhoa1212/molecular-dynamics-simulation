@@ -8,6 +8,35 @@ import numpy as np
 import tifffile
 
 
+def convert_jpg_to_frames(input_path, output_folder, image_format="png"):
+    """Convert a JPG image to different image format."""
+    if os.path.isdir(input_path):
+        jpg_files = sorted(
+            [f for f in os.listdir(input_path) if f.lower().endswith((".jpg", ".jpeg"))]
+        )
+        if not jpg_files:
+            print(f"No .jpg files found in directory: {input_path}")
+            return
+        for fname in jpg_files:
+            base = os.path.splitext(fname)[0]
+            convert_jpg_to_frames(
+                os.path.join(input_path, fname),
+                output_folder,
+                image_format=image_format,
+            )
+        return
+
+    os.makedirs(output_folder, exist_ok=True)
+
+    try:
+        print(input_path)
+        img = cv2.imread(input_path)
+        base = os.path.splitext(os.path.basename(input_path))[0]
+        cv2.imwrite(os.path.join(output_folder, f"{base}.{image_format}"), img)
+    except cv2.error as e:
+        print(f"Error converting JPG '{input_path}': {e}")
+
+
 def convert_tif_to_frames(input_path, output_folder, image_format="png", nth=10):
     """Convert multi-page TIFF files to individual image frames saved in output_folder."""
 
@@ -96,6 +125,12 @@ if __name__ == "__main__":
         "output_dir", nargs="?", default=output_dir, help="Directory to save frames"
     )
     parser.add_argument(
+        "convert_jpg",
+        type=bool,
+        default=False,
+        help="Set to True to convert JPG images instead of TIFF",
+    )
+    parser.add_argument(
         "-n",
         "--nth",
         dest="nth",
@@ -112,4 +147,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    convert_tif_to_frames(args.input_path, args.output_dir, args.image_format, args.nth)
+    if args.convert_jpg:
+        convert_jpg_to_frames(args.input_path, args.output_dir, args.image_format)
+    else:
+        convert_tif_to_frames(
+            args.input_path, args.output_dir, args.image_format, args.nth
+        )

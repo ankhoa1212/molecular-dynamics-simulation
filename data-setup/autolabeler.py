@@ -107,11 +107,16 @@ def _overlay_labels(label_file, img):
         if len(parts) == 5:
             _, x_c, y_c, ww, hh = map(float, parts)
             iw, ih = img.size
-            x1 = (x_c - ww / 2) * iw
-            y1 = (y_c - hh / 2) * ih
-            x2 = (x_c + ww / 2) * iw
-            y2 = (y_c + hh / 2) * ih
-            draw.rectangle([x1, y1, x2, y2], outline="red", width=2)
+            draw.rectangle(
+                [
+                    (x_c - ww / 2) * iw,
+                    (y_c - hh / 2) * ih,
+                    (x_c + ww / 2) * iw,
+                    (y_c + hh / 2) * ih,
+                ],
+                outline="red",
+                width=2,
+            )
 
 
 def _save_label_overlay(i, image_path, label_folder, output_path):

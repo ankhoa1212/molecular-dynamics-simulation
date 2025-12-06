@@ -3,6 +3,41 @@ import pandas as pd
 import os
 from PIL import Image, ImageDraw
 import numpy as np
+from ultralytics import YOLO
+
+def generate_yolo_labels(input_path, output_label_folder, model_path='yolov8m.pt'):
+    model = YOLO(model_path)
+    
+    # Load single PNG or all PNGs in a folder (sorted)
+    frames = []
+    if os.path.isfile(input_path) and input_path.lower().endswith('.png'):
+        files = [input_path]
+    elif os.path.isdir(input_path):
+        files = sorted(
+            os.path.join(input_path, f)
+            for f in os.listdir(input_path)
+            if f.lower().endswith('.png')
+        )
+        if not files:
+            raise ValueError(f"No PNG files found in folder: {input_path}")
+        for fp in files:
+            img = Image.open(fp).convert('L')
+            frames.append(np.array(img))
+    else:
+        raise ValueError("input_path must be a .png file or a folder containing .png files")
+
+    os.makedirs(output_label_folder, exist_ok=True)
+
+    for i, fp in enumerate(files):
+        results = model.predict(fp, save=True, verbose=True)
+        label_file = os.path.join(output_label_folder, f"frame_{i:05d}.txt")
+        with open(label_file, 'w') as file:
+            for result in results:
+                boxes = result.boxes
+                for box in boxes:
+                    cls = int(box.cls[0])
+                    x_center, y_center, w, h = box.xywhn[0].tolist()
+                    file.write(f"{cls} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}\n")
 
 def generate_pseudo_labels(input_path, output_label_folder, diameter=41, minmass=200, box_size=40):
     # Load single PNG or all PNGs in a folder (sorted)
@@ -83,7 +118,8 @@ input_path = "/home/ankhoa1212/git/molecular-dynamics-simulation/data-setup/Au C
 base_name = os.path.splitext(os.path.basename(input_path))[0]
 output_dir = os.path.join(os.getcwd(), f"{base_name}_frames")
 
-# generate_pseudo_labels("path/to/image.png", "dataset/labels/train")
+# custom_yolo_model = 'yolov8n.pt'  # replace with path to custom-trained model if available
+# generate_yolo_labels(input_path, output_dir, model_path=custom_yolo_model)
 generate_pseudo_labels(input_path, output_dir)
 
 # Overlay labels on images and save as new PNGs

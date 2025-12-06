@@ -1,5 +1,12 @@
 log.lammps
+
 venv/
 output/
-testing/
+tests/
+data/
+runs/
+
+**/__pycache__/
+__pycache__/
+
 *.csv

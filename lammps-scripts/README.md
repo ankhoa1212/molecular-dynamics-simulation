@@ -43,6 +43,12 @@ For example:
 
 ### Plotting Results with `graph.py`
 
+Install requirements
+
+```bash
+pip install -r requirements.txt
+```
+
 To generate plots from simulation output data, use:
 
 ```bash

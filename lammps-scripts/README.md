@@ -52,13 +52,13 @@ pip install -r requirements.txt
 To generate plots from simulation output data, use:
 
 ```bash
-python3 graph.py <output_dir> <property>
+python3 graph.py <filename>
 ```
 
 For example:
 
 ```bash
-python3 graph.py tests energy
+python3 graph.py test.lammpstrj
 ```
 
 - `<output_dir>`: Directory containing simulation outputs (e.g., `tests`)

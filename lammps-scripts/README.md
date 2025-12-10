@@ -29,16 +29,6 @@ For example:
 ./run.sh central_pair_interaction.in tests 1000 2000 1000 5.0 10.0 5.0
 ```
 
-**Arguments:**
-- `<input_file>`: LAMMPS input script (e.g., `central_pair_interaction.in`)
-- `<output_dir>`: Directory to store simulation outputs (e.g., `tests`)
-- `<nsteps>`: Number of simulation steps (e.g., `1000`)
-- `<dump_freq>`: Frequency of dumping trajectory data (e.g., `2000`)
-- `<thermo_freq>`: Frequency of thermo output (e.g., `500`)
-- `<temp>`: Simulation temperature (e.g., `5.0`)
-- `<density>`: Particle density (e.g., `10.0`)
-- `<cutoff>`: Interaction cutoff distance (e.g., `2.0`)
-
 ---
 
 ### Plotting Results with `graph.py`
@@ -61,7 +51,6 @@ For example:
 python3 graph.py test.lammpstrj
 ```
 
-- `<output_dir>`: Directory containing simulation outputs (e.g., `tests`)
-- `<property>`: Property to plot (e.g., `energy`, `temperature`, `pressure`)
+- `<filename>`: Trajectory result file to plot data from
 
 This will produce a plot of the specified property over time using the data in the given output directory.

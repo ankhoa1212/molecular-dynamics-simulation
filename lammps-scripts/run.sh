@@ -65,23 +65,19 @@ fi
 # The input script is the first argument passed to the script.
 INPUT_SCRIPT="$1"
 
-# Create log file name based on the input script
-LOG_FILE="${INPUT_SCRIPT}.log"
-
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 
 # Create log file directory within output directory
 LOG_DIR="${OUTPUT_DIR}/logs"
 mkdir -p "$LOG_DIR"
-LOG_FILE="${LOG_DIR}/${INPUT_SCRIPT}.log"
 
 # --- Run Simulation ---
 echo "=========================================="
 echo "Starting LAMMPS simulation..."
 echo "  Executable: $LAMMPS_EXECUTABLE"
 echo "  Input file: $INPUT_SCRIPT"
-echo "  Log file:   $LOG_FILE"
+echo "  Log dir:   $LOG_DIR"
 echo "  Output dir: $OUTPUT_DIR"
 echo "=========================================="
 
@@ -93,11 +89,20 @@ fi
 # The '-log' flag specifies the output log file.
 # The '-var' flag allows passing a variable into the LAMMPS input script
 for (( m=$MOLECULES; m<=${MOLECULES_END:-$MOLECULES}; m+=${MOLECULES_STEP:-1} )); do
-  for (( e=$(printf "%.0f" "${VAR_EPSILON}"); e<=$(printf "%.0f" "${VAR_EPSILON_END:-$VAR_EPSILON}"); e+=$(printf "%.0f" "${VAR_EPSILON_STEP:-1}") )); do
+  e="${VAR_EPSILON}"
+  end="${VAR_EPSILON_END:-$VAR_EPSILON}"
+  step="${VAR_EPSILON_STEP:-1}"
+  # guard against zero step
+  if [ "$(echo "$step == 0" | bc -l)" -eq 1 ]; then
+    step="1"
+  fi
+  while [ "$(echo "$e <= $end" | bc -l)" -eq 1 ]; do
     EPSILON_VAL=$(printf "%.1f" "$e")
     FILENAME="${INPUT_SCRIPT}_${m}_${EPSILON_VAL}"
+    LOG_FILE="${LOG_DIR}/${FILENAME}.log"
     # add command to commands.txt
     echo "\"$LAMMPS_EXECUTABLE\" -in \"$INPUT_SCRIPT\" -log \"$LOG_FILE\" -var filename \"$FILENAME\" -var molecules \"$m\" -var var_epsilon \"$EPSILON_VAL\"" >> commands.txt
+    e=$(echo "$e + $step" | bc -l)
   done
 done
 
@@ -125,7 +130,7 @@ done
 echo ""
 echo "=========================================="
 echo "LAMMPS simulation finished."
-echo "Check the log file '$LOG_FILE' for details."
+echo "Check the log directory '$LOG_DIR' for details."
 echo "Run the trajectory file with ovito: ovito '$OUTPUT_DIR/${INPUT_SCRIPT}_${MOLECULES}_${VAR_EPSILON}.lammpstrj' for visualization"
 echo "=========================================="
 

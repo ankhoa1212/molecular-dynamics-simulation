@@ -5,8 +5,8 @@ output/
 tests/
 data/
 runs/
+results/
 
 **/__pycache__/
 __pycache__/
 
-*.csv

@@ -81,10 +81,7 @@ echo "  Log dir:   $LOG_DIR"
 echo "  Output dir: $OUTPUT_DIR"
 echo "=========================================="
 
-# Create commands.txt if it doesn't already exist
-if [ ! -f commands.txt ]; then
-  touch commands.txt
-fi
+> commands.txt
 # The '-in' flag specifies the input script.
 # The '-log' flag specifies the output log file.
 # The '-var' flag allows passing a variable into the LAMMPS input script
@@ -114,7 +111,17 @@ else
 fi
 
 echo "Running simulations in parallel with up to $MAX_JOBS jobs..."
-cat commands.txt | xargs -P "$MAX_JOBS" -I {} bash -c {}
+running_jobs=0
+while read -r cmd; do
+  FILENAME=$(echo "$cmd" | grep -oP '(?<=-var filename ")[^"]*')
+  ( bash -c "$cmd" ; mv "${FILENAME}.lammpstrj" "$OUTPUT_DIR/" ) &
+  running_jobs=$((running_jobs + 1))
+  if [ $running_jobs -ge $MAX_JOBS ]; then
+    wait
+    running_jobs=0
+  fi
+done < commands.txt
+wait
 echo "All parallel jobs finished."
 
 # If there is a trajectory file, move it to the output directory.

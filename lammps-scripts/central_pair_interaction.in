@@ -19,6 +19,10 @@ variable	sigma equal 1.0     # distance where particles bond (potential energy i
 variable	delta equal 0.0     # radius difference between particles (for lj/expand)
 variable	cutoff equal 2.0	# cutoff distance (particles farther than this value have the interaction ignored)
 
+# --- Define the variables for langevin ---
+variable    tstart equal ${var_tstart}
+variable    tstop equal ${var_tstop}
+
 # Set ellipsoid as a sphere
 set type 1 shape 0.5 0.5 0.5
 set atom 1 mass 1.0             # set mass of atom type 1
@@ -41,7 +45,7 @@ velocity all set v_vx_init v_vy_init 0.0 sum yes
 
 # --- Integration ---
 fix 1 all nve
-fix 2 all langevin 5.0 0.1 0.1 48279
+fix 2 all langevin ${tstart} ${tstop} 0.1 48279
 
 # --- Simulation Settings ---
 timestep 0.0001 # timestep for integration (in lj time units) - Keep it small for stability
@@ -53,4 +57,4 @@ thermo_style custom step temp pe ke etotal press vol atoms  # Added 'atoms' to c
 dump 1 all custom 100 ${filename}.lammpstrj id type x y vx vy fx fy v_dist
 
 # --- Run Simulation ---
-run 15000
+run ${steps}

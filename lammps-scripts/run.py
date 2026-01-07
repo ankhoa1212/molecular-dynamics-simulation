@@ -130,16 +130,16 @@ def main():
         help="Variable tstop (default: 1.0)",
     )
     parser.add_argument(
-        "--steps", default="15000", help="Simulation steps (default: 15000)"
+        "--steps", default="10000", help="Simulation steps (default: 10000)"
     )
 
     args = parser.parse_args()
 
     # Default values
     output_dir = "results"
-    molecules = "1000"
+    molecules = "100"
     molecules_end = None
-    molecules_step = "1000"
+    molecules_step = "100"
     var_epsilon = "5.0"
     var_epsilon_end = None
     var_epsilon_step = "5.0"

@@ -1,4 +1,103 @@
-## Usage
+### Usage Guide
+
+- [Running Simulations with `run.py`](#running-simulations-with-runpy)
+- [Plotting results with `velocity_graph.py`](#plotting-results-with-velocity_graphpy)
+- [Plotting results with `temp_graph.py`](#plotting-results-with-temp_graphpy)
+- [Plotting results with `phase_diagram.py`](#plotting-results-with-phase_diagrampy)
+- [Older scripts (may not be relevant)](#older-scripts-may-not-be-as-relevant)
+    - [Running Simulations with `run.sh`](#running-simulations-with-runsh)
+    - [Plotting Results with `graph.py`](#plotting-results-with-graphpy)
+
+### Running Simulations with `run.py`
+
+The `run.py` script automates running LAMMPS simulations with configurable parameters. To use it:
+
+```bash
+python3 run.py [options]
+```
+
+To list possible options:
+
+```bash
+python3 run.py -h
+```
+
+Usage examples:
+
+```bash
+python3 run.py --input test.in --output results --molecules 1000
+```
+
+```bash
+python3 run.py --config test/test.json
+```
+
+This will execute a LAMMPS simulation with the specified input file, number of molecules, and epsilon value, storing results in the output directory.
+
+---
+
+### Plotting results with `velocity_graph.py`
+
+The `velocity_graph.py` script generates velocity distribution plots from simulation data. To use it:
+
+```bash
+python3 velocity_graph.py <output_dir>
+```
+
+- `<output_dir>`: Directory containing simulation output files
+
+For example:
+
+```bash
+python3 velocity_graph.py results
+```
+
+This will analyze the velocity data and produce velocity distribution plots.
+
+---
+
+### Plotting results with `temp_graph.py`
+
+The `temp_graph.py` script generates temperature plots from simulation data. To use it:
+
+```bash
+python3 temp_graph.py <output_dir>
+```
+
+- `<output_dir>`: Directory containing simulation output files
+
+For example:
+
+```bash
+python3 temp_graph.py results
+```
+
+This will analyze the temperature data and produce a temperature vs. time plot.
+
+---
+
+### Plotting results with `phase_diagram.py`
+
+The `phase_diagram.py` script generates phase diagrams from simulation data. To use it:
+
+```bash
+python3 phase_diagram.py <output_dir>
+```
+
+- `<output_dir>`: Directory containing simulation output files
+
+For example:
+
+```bash
+python3 phase_diagram.py results
+```
+
+This will analyze the simulation results and produce a phase diagram plot.
+
+---
+
+
+### Older scripts (may not be as relevant)
 
 ### Running Simulations with `run.sh`
 The `run.sh` script automates running multiple LAMMPS simulations by sweeping over a range of molecule counts and epsilon values. The usage is:

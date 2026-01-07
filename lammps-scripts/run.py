@@ -188,25 +188,21 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
 
-    print("==========================================")
+    print("=" * 100)
     print("Starting LAMMPS simulation...")
     print(f"  Executable: {lammps_executable}")
     print(f"  Input file: {input_script}")
     print(f"  Log dir:   {log_dir}")
     print(f"  Output dir: {output_dir}")
-    print("==========================================")
+    print("=" * 100)
 
     commands = []
 
-    # Generate commands
     # Clear commands.txt
     with open("commands.txt", "w", encoding="utf-8") as f:
         pass
 
     m = m_start
-    # Loop for molecules
-    # Bash: for (( m=$MOLECULES; m<=${MOLECULES_END:-$MOLECULES}; m+=${MOLECULES_STEP:-1} )); do
-    # We need to handle the loop carefully to match bash inclusive range and step
 
     # Helper to check loop condition
     def check_molecules_loop(current_m, end_m, step_m):
@@ -273,16 +269,27 @@ def main():
             shutil.move(file, os.path.join(output_dir, file))
             print(f"Moved trajectory file '{file}' to '{output_dir}/'")
 
-    print("")
-    print("==========================================")
+    print("=" * 100)
     print("LAMMPS simulation finished.")
     print(f"Check the log directory '{log_dir}' for details.")
 
     example_epsilon = f"{e_start:.1f}"
     print(
-        f"Run the trajectory file with ovito: ovito '{output_dir}/{input_script}_{m_start}_{example_epsilon}.lammpstrj' for visualization"
+        f"Visualize the output: 'ovito {output_dir}/{input_script}_{m_start}_{example_epsilon}.lammpstrj'"
     )
-    print("==========================================")
+    print(
+        f"Graph the temperature: 'python temp_graph.py --filename {output_dir}/{input_script}_{m_start}_{example_epsilon}.lammpstrj'"
+    )
+    print(
+        f"Graph the velocity: 'python velocity_graph.py --filename {output_dir}/{input_script}_{m_start}_{example_epsilon}.lammpstrj'"
+    )
+    print(
+        f"Graph the hexatic order: 'python hexatic_order_graph.py {output_dir}/{input_script}_{m_start}_{example_epsilon}.lammpstrj'"
+    )
+    print(
+        f"Create a phase diagram of the outputs: 'python phase_diagram.py {output_dir}'"
+    )
+    print("=" * 100)
 
 
 if __name__ == "__main__":

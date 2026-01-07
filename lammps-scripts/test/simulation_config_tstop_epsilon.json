@@ -1,6 +1,6 @@
 {
     "input_file": "test.in",
-    "output_dir": "same_temp",
+    "output_dir": "tstop_epsilon",
     "molecules": "100",
     "molecules_end": "1500",
     "molecules_step": "100",

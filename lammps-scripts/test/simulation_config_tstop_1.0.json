@@ -1,6 +1,6 @@
 {
     "input_file": "test.in",
-    "output_dir": "1.0_temp",
+    "output_dir": "tstop_1.0",
     "molecules": "100",
     "molecules_end": "1500",
     "molecules_step": "100",

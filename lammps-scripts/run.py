@@ -129,6 +129,13 @@ def main():
         default="1.0",
         help="Variable tstop (default: 1.0)",
     )
+
+    parser.add_argument(
+        "--vel_force_scale",
+        dest="vel_force_scale",
+        default=None,
+        help="Scaling factor for initial velocity or continuous force (default: 9 for velocity_initialization.in, 1.0 for continuous_force.in)",
+    )
     parser.add_argument(
         "--steps", default="10000", help="Simulation steps (default: 10000)"
     )
@@ -143,6 +150,7 @@ def main():
     var_epsilon = "5.0"
     var_epsilon_end = None
     var_epsilon_step = "5.0"
+    vel_force_scale = args.vel_force_scale
 
     # Apply logic similar to bash script
     if args.output_dir is not None:
@@ -177,6 +185,14 @@ def main():
         e_step = float(var_epsilon_step)
         if e_step == 0:
             e_step = 1.0
+
+        # Set default scale if not provided
+        if vel_force_scale is None:
+            # Choose default based on input script
+            if "velocity_initialization" in input_script:
+                vel_force_scale = "9"
+            else:
+                vel_force_scale = "1.0"
     except ValueError as e:
         print(f"Error parsing arguments: {e}")
         sys.exit(1)
@@ -237,7 +253,8 @@ def main():
             cmd = (
                 f'"{lammps_executable}" -in "{input_script}" -log "{log_file}" '
                 f'-var filename "{filename}" -var molecules "{m}" -var var_epsilon "{epsilon_val}" '
-                f'-var var_tstart "{current_tstart}" -var var_tstop "{current_tstop}" -var steps "{args.steps}"'
+                f'-var var_tstart "{current_tstart}" -var var_tstop "{current_tstop}" -var steps "{args.steps}" '
+                f'-var vel_force_scale "{vel_force_scale}"'
             )
             commands.append((cmd, filename))
 

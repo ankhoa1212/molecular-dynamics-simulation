@@ -1,0 +1,59 @@
+# --- Initialization ---
+units lj          # Use Lennard-Jones units
+atom_style ellipsoid
+dimension 3
+boundary f f p
+
+# --- Simulation box ---
+variable box_size equal 200
+variable half_box equal ${box_size}/2
+region box block 0 ${box_size} 0 ${box_size} -0.5 0.5 units box # Define simulation box boundaries
+create_box 1 box                # create the simulation box with 1 atom type
+create_atoms 1 random ${molecules} 12345 NULL overlap 3.9 maxtry 50
+
+# lj/expand variables
+variable	epsilon equal ${var_epsilon}	# energy (strength of attraction between particles)
+variable	sigma equal 1.0     # distance where particles bond (potential energy is 0)
+variable	delta equal 0.0     # radius difference between particles (for lj/expand)
+variable	cutoff equal 2.0	# cutoff distance (particles farther than this value have the interaction ignored)
+
+# Langevin variables
+variable    tstart equal ${var_tstart}
+variable    tstop equal ${var_tstop}
+
+# Set ellipsoid as a sphere
+set type 1 shape 0.5 0.5 0.5
+set atom 1 mass 1.0             # set mass of atom type 1
+
+## Velocity variables
+variable center_x equal ${half_box}
+variable center_y equal ${half_box}
+variable vel_scale equal ${vel_force_scale} # scaling factor for initial velocity magnitude (settable from run.py)
+variable dist atom sqrt((x-${center_x})^2+(y-${center_y})^2)
+
+# --- Interactions ---
+pair_style lj/expand 2.5
+pair_coeff 1 1 ${epsilon} ${sigma} ${delta} ${cutoff}
+
+# --- Initial Velocities ---
+variable vx_init atom v_vel_scale*(${half_box}-x)
+variable vy_init atom v_vel_scale*(${half_box}-y)
+# Apply the calculated velocities to all atoms
+# velocity all create ${tstart} 12345 dist gaussian mom yes rot no
+velocity all set v_vx_init v_vy_init 0.0
+
+# --- Integration ---
+fix 1 all nve
+fix 2 all langevin ${tstart} ${tstop} 0.1 48279
+
+# --- Simulation Settings ---
+timestep 0.0001 # timestep for integration (in lj time units) - Keep it small for stability
+thermo 100      # output thermodynamic info every 100 steps
+thermo_style custom step temp pe ke etotal press vol atoms  # Added 'atoms' to check count
+
+# --- Output ---
+# dump atom positions and velocities every 100 steps to a .lammpstrj file
+dump 1 all custom 100 ${filename}.lammpstrj id type x y vx vy fx fy v_dist
+
+# --- Run Simulation ---
+run ${steps}

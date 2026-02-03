@@ -4,11 +4,11 @@
     "molecules": "100",
     "molecules_end": "1500",
     "molecules_step": "100",
-    "var_epsilon": "5.0",
+    "var_epsilon": "0.5",
     "var_epsilon_end": "5.0",
-    "var_epsilon_step": "5.0",
+    "var_epsilon_step": "0.5",
     "t_start": "1.0",
     "t_stop": "0.05",
-    "steps": "10000",
-    "vel_force_scale": "9"
+    "steps": "15000",
+    "vel_force_scale": "1"
 }

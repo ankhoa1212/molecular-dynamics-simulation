@@ -42,8 +42,11 @@ def convert_trajectory_to_video(
         # Import the trajectory file
         pipeline = import_file(str(input_path))
 
-        # Add the pipeline to the scene
+        # Add the pipeline to the scene first
         pipeline.add_to_scene()
+
+        # Compute the pipeline to ensure data is loaded
+        pipeline.compute()
 
         # Set up the viewport
         viewport = Viewport()

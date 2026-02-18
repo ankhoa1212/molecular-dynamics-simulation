@@ -11,13 +11,24 @@ from hexatic_order_analysis import parse_and_calc_hexatic
 def extract_epsilon_and_molecules(filename):
     """
     Extracts the epsilon and molecules values from the filename.
-    Expected format: *.in_{molecules}_{epsilon}.lammpstrj
+    Expected format: 
+      - *.in_{molecules}_{epsilon}.lammpstrj (Old format)
+      - *_{molecules}_{epsilon}.lammpstrj (New format)
     """
-    match = re.search(r"\.in_(\d+)_([+-]?\d*\.\d+|\d+)\.(lammpstrj|log)", filename)
-    if match:
-        molecules = int(match.group(1))
-        epsilon = float(match.group(2))
+    # Regex for new format (flexible script name, followed by _NUM_FLOAT.ext)
+    match_new = re.search(r"_(\d+)_([+-]?\d*\.\d+|\d+)\.(lammpstrj|log)$", filename)
+    if match_new:
+        molecules = int(match_new.group(1))
+        epsilon = float(match_new.group(2))
         return molecules, epsilon
+
+    # Regex for old format (*.in_NUM_FLOAT.ext)
+    match_old = re.search(r"\.in_(\d+)_([+-]?\d*\.\d+|\d+)\.(lammpstrj|log)", filename)
+    if match_old:
+        molecules = int(match_old.group(1))
+        epsilon = float(match_old.group(2))
+        return molecules, epsilon
+
     return None, None
 
 

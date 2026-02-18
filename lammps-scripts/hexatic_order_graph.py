@@ -14,6 +14,8 @@ if __name__ == "__main__":
         nargs="?",
         help="Specific LAMMPS trajectory file to process. If not provided, processes all in results/.",
     )
+    parser.add_argument("--output_dir", default=None, help="Output directory")
+    parser.add_argument("--no-show", action="store_true", help="Do not display the graph")
     args = parser.parse_args()
 
     if args.filename:
@@ -36,9 +38,22 @@ if __name__ == "__main__":
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
 
-        output = (
-            f"{filename[:filename.find('.')]}_{n_molecules}_{eps}_hexatic_order.png"
-        )
+        if "." in filename:
+             base = filename[:filename.rfind(".")]
+        else:
+             base = filename
+        
+        output_filename = f"{base}_hexatic_order.png"
+
+        if args.output_dir:
+            # Ensure output directory exists if provided
+            if not os.path.exists(args.output_dir):
+                 os.makedirs(args.output_dir)
+            output = os.path.join(args.output_dir, output_filename)
+        else:
+            output = output_filename
+
         plt.savefig(output, dpi=300)
         print(f"Graph saved to {output}")
-        plt.show()
+        if not args.no_show:
+            plt.show()

@@ -198,6 +198,12 @@ def main():
         sys.exit(1)
 
     input_script = args.input_file
+    
+    # Strip .in extension for output filename generation
+    base_script_name = os.path.basename(input_script)
+    if base_script_name.endswith(".in"):
+        base_script_name = base_script_name[:-3]
+        
     log_dir = os.path.join(output_dir, "logs")
 
     # Create directories
@@ -239,7 +245,7 @@ def main():
 
         while check_epsilon_loop(e, e_end, e_step):
             epsilon_val = f"{e:.1f}"
-            filename = f"{input_script}_{m}_{epsilon_val}"
+            filename = f"{base_script_name}_{m}_{epsilon_val}"
             log_file = os.path.join(log_dir, f"{filename}.log")
 
             # Set current tstart and tstop to either epsilon or fixed value
@@ -292,16 +298,16 @@ def main():
 
     example_epsilon = f"{e_start:.1f}"
     print(
-        f"Visualize the output: 'ovito {output_dir}/{input_script}_{m_start}_{example_epsilon}.lammpstrj'"
+        f"Visualize the output: 'ovito {output_dir}/{base_script_name}_{m_start}_{example_epsilon}.lammpstrj'"
     )
     print(
-        f"Graph the temperature: 'python temp_graph.py --filename {output_dir}/{input_script}_{m_start}_{example_epsilon}.lammpstrj'"
+        f"Graph the temperature: 'python temp_graph.py --filename {output_dir}/{base_script_name}_{m_start}_{example_epsilon}.lammpstrj'"
     )
     print(
-        f"Graph the velocity: 'python velocity_graph.py --filename {output_dir}/{input_script}_{m_start}_{example_epsilon}.lammpstrj'"
+        f"Graph the velocity: 'python velocity_graph.py --filename {output_dir}/{base_script_name}_{m_start}_{example_epsilon}.lammpstrj'"
     )
     print(
-        f"Graph the hexatic order: 'python hexatic_order_graph.py {output_dir}/{input_script}_{m_start}_{example_epsilon}.lammpstrj'"
+        f"Graph the hexatic order: 'python hexatic_order_graph.py {output_dir}/{base_script_name}_{m_start}_{example_epsilon}.lammpstrj'"
     )
     print(
         f"Create a phase diagram of the outputs: 'python phase_diagram.py {output_dir}'"

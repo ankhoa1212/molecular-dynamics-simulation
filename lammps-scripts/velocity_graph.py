@@ -10,6 +10,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
+from lammps_parser import parse_lammps_dump
+
 
 def _process_velocity_data(filename):
     """
@@ -20,54 +22,38 @@ def _process_velocity_data(filename):
     avg_velocities = []
     std_velocities = []
 
-    current_velocities = []
-    reading_atoms = False
-    vx_idx = 0
-    vy_idx = 0
+    for frame in parse_lammps_dump(filename):
+        timesteps.append(frame["timestep"])
+        atom_lines = frame["atoms"]
+        
+        # Parse atom header to find column indices
+        atom_header = frame["atom_header"]
+        # Format is usually "ITEM: ATOMS id type x y vx vy"
+        header_parts = atom_header.split()[2:]
+        try:
+            vx_idx = header_parts.index("vx")
+            vy_idx = header_parts.index("vy")
+        except ValueError:
+            # If columns are missing, skip this frame or assume defaults?
+            # Original code would skip if columns missing.
+            avg_velocities.append(0)
+            std_velocities.append(0)
+            continue
 
-    with open(filename, "r", encoding="utf-8") as f:
-        for line in f:
-            if line.startswith("ITEM: TIMESTEP"):
-                # If we just finished a frame, calculate the average
-                if current_velocities:
-                    avg_velocities.append(np.mean(current_velocities))
-                    std_velocities.append(np.std(current_velocities))
-                    current_velocities = []
-                reading_atoms = False
-                try:
-                    timesteps.append(int(next(f)))
-                except StopIteration:
-                    break
-
-            elif line.startswith("ITEM: ATOMS"):
-                reading_atoms = True
-                # Identify column indices for vx and vy
-                header = line.split()[2:]
-                try:
-                    vx_idx = header.index("vx")
-                    vy_idx = header.index("vy")
-                except ValueError:
-                    # If vx/vy are missing, skipping or handling error would be appropriate,
-                    # but for now we'll assume they exist or let it fail later.
-                    pass
-                continue
-
-            elif reading_atoms:
-                parts = line.split()
-                if not parts:
-                    continue
-                # Ensure we have enough parts before accessing
-                if len(parts) > max(vx_idx, vy_idx):
-                    vx = float(parts[vx_idx])
-                    vy = float(parts[vy_idx])
-                    # Calculate magnitude: sqrt(vx^2 + vy^2)
-                    v_mag = np.sqrt(vx**2 + vy**2)
-                    current_velocities.append(v_mag)
-
-        # Append the final frame
-        if current_velocities:
-            avg_velocities.append(np.mean(current_velocities))
-            std_velocities.append(np.std(current_velocities))
+        raw_data = []
+        for line in atom_lines:
+            parts = line.split()
+            if len(parts) > max(vx_idx, vy_idx):
+                vx = float(parts[vx_idx])
+                vy = float(parts[vy_idx])
+                raw_data.append(np.sqrt(vx**2 + vy**2))
+        
+        if raw_data:
+            avg_velocities.append(np.mean(raw_data))
+            std_velocities.append(np.std(raw_data))
+        else:
+            avg_velocities.append(0)
+            std_velocities.append(0)
 
     return timesteps, avg_velocities, std_velocities
 

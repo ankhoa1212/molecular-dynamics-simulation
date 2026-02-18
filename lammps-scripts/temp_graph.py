@@ -11,6 +11,8 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
+from lammps_parser import parse_lammps_dump
+
 
 def generate_temp_graph_filename(filename, ending, output_dir=None):
     """
@@ -91,17 +93,19 @@ def plot_log_temperature(filename, output_dir=None, no_show=False):
         plt.show()
 
 
-def _read_frame_atoms(f, n_atoms):
+def _process_atom_lines(atom_lines):
     """
-    Reads atom data from file and returns position and velocity arrays.
+    Parses atom lines and returns position and velocity arrays.
     """
-    data = []
-    for _ in range(n_atoms):
-        line = f.readline().split()
+    data_list = []
+    for line in atom_lines:
+        parts = line.split()
         # x, y, vx, vy are indices 2, 3, 4, 5
-        data.append([float(line[2]), float(line[3]), float(line[4]), float(line[5])])
+        data_list.append([
+            float(parts[2]), float(parts[3]), float(parts[4]), float(parts[5])
+        ])
 
-    data_arr = np.array(data)
+    data_arr = np.array(data_list)
     return data_arr[:, 0], data_arr[:, 1], data_arr[:, 2], data_arr[:, 3]
 
 
@@ -148,13 +152,6 @@ def _compute_frame_temperature(x, y, vx, vy, n_atoms):
     return t_tot, t_corrected
 
 
-def _process_frame_temp(f, n_atoms):
-    """Reads frame atoms and computes temperatures."""
-    x, y, vx, vy = _read_frame_atoms(f, n_atoms)
-    return _compute_frame_temperature(x, y, vx, vy, n_atoms)
-
-
-
 def plot_temperatures(filename, output_dir=None, no_show=False):
     """
     Plots drift-corrected temperature from a LAMMPS dump file.
@@ -164,29 +161,29 @@ def plot_temperatures(filename, output_dir=None, no_show=False):
     corrected_temps = []  # Drift-Corrected (True Thermal)
 
     print(f"Reading file: {filename}...")
-    n_atoms = 0
 
-    with open(filename, "r", encoding="utf-8") as f:
-        while True:
-            line = f.readline()
-            if not line:
-                break
+    try:
+        for frame in parse_lammps_dump(filename):
+            step = frame["timestep"]
+            n_atoms = frame["n_atoms"]
 
-            if "ITEM: TIMESTEP" in line:
-                step = int(f.readline().strip())
-                timesteps.append(step)
+            if n_atoms == 0:
+                continue
 
-            elif "ITEM: NUMBER OF ATOMS" in line:
-                n_atoms = int(f.readline().strip())
+            x, y, vx, vy = _process_atom_lines(frame["atoms"])
+            t_tot, t_corr = _compute_frame_temperature(x, y, vx, vy, n_atoms)
+            
+            timesteps.append(step)
+            total_temps.append(t_tot)
+            corrected_temps.append(t_corr)
 
-            elif "ITEM: ATOMS" in line:
-                if n_atoms == 0:
-                    # Skip header or malformed frame
-                    continue
+    except FileNotFoundError:
+        print(f"Error: File '{filename}' not found.")
+        return
 
-                t_tot, t_corr = _process_frame_temp(f, n_atoms)
-                total_temps.append(t_tot)
-                corrected_temps.append(t_corr)
+    if not timesteps:
+        print("No valid temperature data found.")
+        return
 
     # Plotting
     plt.figure(figsize=(10, 6))

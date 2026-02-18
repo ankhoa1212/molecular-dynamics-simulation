@@ -9,33 +9,29 @@ import freud
 import matplotlib.pyplot as plt
 import numpy as np
 
+from lammps_parser import parse_lammps_dump
 
-def _read_box_bounds(f):
-    """
-    Reads box bounds from the file stream and returns a freud Box.
-    """
-    x_range = [float(x) for x in f.readline().split()]
-    y_range = [float(y) for y in f.readline().split()]
-    _ = f.readline()  # Skip z_range
 
+def _process_box(box_lines):
+    """Parses box bounds from list of strings."""
+    x_range = [float(x) for x in box_lines[0].split()]
+    y_range = [float(y) for y in box_lines[1].split()]
+    
     box_lx = x_range[1] - x_range[0]
     box_ly = y_range[1] - y_range[0]
     return freud.Box(Lx=box_lx, Ly=box_ly, is2D=True)
 
 
-def _read_atoms(f, n_atoms):
+def _process_atoms(atom_lines):
     """
-    Reads atom data from the file stream.
+    Parses atom data from list of strings.
     Returns positions array (Nx3).
     """
-    data = []
-    for _ in range(n_atoms):
-        data.append(f.readline().split())
-
-    data = np.array(data, dtype=float)
+    data_list = [line.split() for line in atom_lines]
+    data = np.array(data_list, dtype=float)
     positions = data[:, 2:4]  # Grab x and y columns (index 2 and 3)
     # Add a zero z-column for freud compatibility
-    return np.column_stack((positions, np.zeros(n_atoms)))
+    return np.column_stack((positions, np.zeros(len(atom_lines))))
 
 
 def parse_and_calc_hexatic(filename, verbose=1):
@@ -52,48 +48,26 @@ def parse_and_calc_hexatic(filename, verbose=1):
     steps = []
     psi6_means = []
 
-    # Initialize variables
-    n_atoms = 0
-    current_box = None
-    step = 0
+    for frame in parse_lammps_dump(filename):
+        step = frame["timestep"]
+        steps.append(step)
 
-    with open(filename, "r", encoding="utf-8") as f:
-        while True:
-            line = f.readline()
-            if not line:
-                break
+        current_box = _process_box(frame["box_bounds"])
+        positions = _process_atoms(frame["atoms"])
 
-            if "ITEM: TIMESTEP" in line:
-                step = int(f.readline())
-                steps.append(step)
+        # Calculate Hexatic Order
+        hex_comp = freud.order.Hexatic(k=6)
+        hex_comp.compute(
+            system=(current_box, positions), neighbors={"num_neighbors": 6}
+        )
 
-            elif "ITEM: NUMBER OF ATOMS" in line:
-                n_atoms = int(f.readline())
+        # Magnitude of psi6 for each atom
+        mag_psi6 = np.abs(hex_comp.particle_order)
+        mean_psi6 = np.mean(mag_psi6)
+        psi6_means.append(mean_psi6)
 
-            elif "ITEM: BOX BOUNDS" in line:
-                current_box = _read_box_bounds(f)
-
-            elif "ITEM: ATOMS" in line:
-                if current_box is None:
-                    # Skip if box not defined (should not happen in valid dump)
-                    _read_atoms(f, n_atoms)
-                    continue
-
-                positions = _read_atoms(f, n_atoms)
-
-                # Calculate Hexatic Order
-                hex_comp = freud.order.Hexatic(k=6)
-                hex_comp.compute(
-                    system=(current_box, positions), neighbors={"num_neighbors": 6}
-                )
-
-                # Magnitude of psi6 for each atom
-                mag_psi6 = np.abs(hex_comp.particle_order)
-                mean_psi6 = np.mean(mag_psi6)
-                psi6_means.append(mean_psi6)
-
-                if verbose:
-                    print(f"Step {step}: Avg |psi6| = {mean_psi6:.4f}")
+        if verbose:
+            print(f"Step {step}: Avg |psi6| = {mean_psi6:.4f}")
 
     return steps, psi6_means
 

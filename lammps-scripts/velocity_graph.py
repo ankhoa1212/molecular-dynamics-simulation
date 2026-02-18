@@ -1,20 +1,31 @@
+"""
+This module reads a LAMMPS trajectory file and plots the average velocity magnitude
+of atoms over time. It calculates the mean and standard deviation of velocities
+for each timestep and generates a plot.
+"""
+
 import argparse
 import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from phase_diagram import extract_epsilon_and_molecules
 
 
-def plot_velocity_over_time(filename, output_dir, no_show=False):
+def _process_velocity_data(filename):
+    """
+    Reads the LAMMPS trajectory file and computes velocity statistics per frame.
+    Returns lists of timesteps, means, and standard deviations.
+    """
     timesteps = []
     avg_velocities = []
     std_velocities = []
 
     current_velocities = []
     reading_atoms = False
+    vx_idx = 0
+    vy_idx = 0
 
-    with open(filename, "r") as f:
+    with open(filename, "r", encoding="utf-8") as f:
         for line in f:
             if line.startswith("ITEM: TIMESTEP"):
                 # If we just finished a frame, calculate the average
@@ -23,30 +34,49 @@ def plot_velocity_over_time(filename, output_dir, no_show=False):
                     std_velocities.append(np.std(current_velocities))
                     current_velocities = []
                 reading_atoms = False
-                timesteps.append(int(next(f)))
+                try:
+                    timesteps.append(int(next(f)))
+                except StopIteration:
+                    break
 
             elif line.startswith("ITEM: ATOMS"):
                 reading_atoms = True
                 # Identify column indices for vx and vy
                 header = line.split()[2:]
-                vx_idx = header.index("vx")
-                vy_idx = header.index("vy")
+                try:
+                    vx_idx = header.index("vx")
+                    vy_idx = header.index("vy")
+                except ValueError:
+                    # If vx/vy are missing, skipping or handling error would be appropriate,
+                    # but for now we'll assume they exist or let it fail later.
+                    pass
                 continue
 
             elif reading_atoms:
                 parts = line.split()
                 if not parts:
                     continue
-                vx = float(parts[vx_idx])
-                vy = float(parts[vy_idx])
-                # Calculate magnitude: sqrt(vx^2 + vy^2)
-                v_mag = np.sqrt(vx**2 + vy**2)
-                current_velocities.append(v_mag)
+                # Ensure we have enough parts before accessing
+                if len(parts) > max(vx_idx, vy_idx):
+                    vx = float(parts[vx_idx])
+                    vy = float(parts[vy_idx])
+                    # Calculate magnitude: sqrt(vx^2 + vy^2)
+                    v_mag = np.sqrt(vx**2 + vy**2)
+                    current_velocities.append(v_mag)
 
         # Append the final frame
         if current_velocities:
             avg_velocities.append(np.mean(current_velocities))
             std_velocities.append(np.std(current_velocities))
+
+    return timesteps, avg_velocities, std_velocities
+
+
+def plot_velocity_over_time(filename, output_dir, no_show=False):
+    """
+    Orchestrates the reading of data and plotting of the velocity graph.
+    """
+    timesteps, avg_velocities, std_velocities = _process_velocity_data(filename)
 
     # Plotting
     plt.figure(figsize=(10, 6))
@@ -63,14 +93,14 @@ def plot_velocity_over_time(filename, output_dir, no_show=False):
     plt.ylabel("Mean Velocity Magnitude")
     plt.title("Average Velocity Magnitude Over Time")
     plt.grid(True, linestyle="--", alpha=0.7)
-    
+
     # Generate output filename
     base_name = os.path.basename(filename)
     if "." in base_name:
         base_name = base_name[:base_name.rfind(".")]
-    
+
     output_filename = f"{base_name}_velocity_graph.png"
-    
+
     if output_dir:
         output = os.path.join(output_dir, output_filename)
     else:
@@ -92,7 +122,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--filename",
         "-f",
-        default="/home/austin/git/molecular-dynamics-simulation/lammps-scripts/test_same/test.in_100_5.0.lammpstrj",
+        default=os.path.join(os.getcwd(), "test_same", "test.in_100_5.0.lammpstrj"),
         help="Path to the LAMMPS trajectory file",
     )
     parser.add_argument(

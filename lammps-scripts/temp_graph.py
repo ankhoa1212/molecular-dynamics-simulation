@@ -1,27 +1,38 @@
+"""
+This module processes LAMMPS log and dump files to plot temperature evolution over time.
+It supports both standard thermodynamic output from logs and drift-corrected temperature
+calculations from trajectory dump files.
+"""
+
 import argparse
 import os
 import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-from phase_diagram import extract_epsilon_and_molecules
 
 
 def generate_temp_graph_filename(filename, ending, output_dir=None):
+    """
+    Generates a consistent output filename for the temperature graph.
+    """
     # Get base filename without extension
     base_name = os.path.basename(filename)
     if "." in base_name:
         base_name = base_name[:base_name.rfind(".")]
-    
+
     out_name = f"{base_name}_temp_graph_{ending}.png"
-    
+
     if output_dir:
         out_name = os.path.join(output_dir, out_name)
-    
+
     return out_name
 
 
 def plot_log_temperature(filename, output_dir=None, no_show=False):
+    """
+    Plots temperature from a LAMMPS log file.
+    """
     steps = []
     temps = []
 
@@ -30,7 +41,7 @@ def plot_log_temperature(filename, output_dir=None, no_show=False):
     reading_data = False
 
     try:
-        with open(filename, "r") as f:
+        with open(filename, "r", encoding="utf-8") as f:
             for line in f:
                 # Detect the start of the data table in log.lammps
                 if "Step" in line and "Temp" in line:
@@ -80,18 +91,82 @@ def plot_log_temperature(filename, output_dir=None, no_show=False):
         plt.show()
 
 
+def _read_frame_atoms(f, n_atoms):
+    """
+    Reads atom data from file and returns position and velocity arrays.
+    """
+    data = []
+    for _ in range(n_atoms):
+        line = f.readline().split()
+        # x, y, vx, vy are indices 2, 3, 4, 5
+        data.append([float(line[2]), float(line[3]), float(line[4]), float(line[5])])
+
+    data_arr = np.array(data)
+    return data_arr[:, 0], data_arr[:, 1], data_arr[:, 2], data_arr[:, 3]
+
+
+def _compute_radial_projection(x, y, vx, vy):
+    """Computes radial velocity and tangential squared velocity."""
+    center_x = 100.0
+    center_y = 100.0
+    dx = x - center_x
+    dy = y - center_y
+    dist = np.sqrt(dx**2 + dy**2)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rx = np.divide(dx, dist, out=np.zeros_like(dx), where=dist != 0)
+        ry = np.divide(dy, dist, out=np.zeros_like(dy), where=dist != 0)
+
+    v_rad = vx * rx + vy * ry
+    v_sq = vx**2 + vy**2
+    v_tan_sq = v_sq - v_rad**2
+    return v_rad, v_sq, v_tan_sq
+
+
+def _compute_frame_temperature(x, y, vx, vy, n_atoms):
+    """
+    Computes standard and drift-corrected temperatures for a single frame.
+    """
+    v_rad, v_sq, v_tan_sq = _compute_radial_projection(x, y, vx, vy)
+
+    # --- 2. Calculate "Standard" Total Temperature ---
+    # Raw KE = 0.5 * m * (vx^2 + vy^2)
+    # T = Sum(v^2) / (2 * N)  [2 Degrees of Freedom]
+    t_tot = np.sum(v_sq) / (2.0 * n_atoms)
+
+    # --- 3. Calculate Drift-Corrected Temperature ---
+    # Calculate the Mean Radial Velocity (The "Bulk Implosion Speed")
+    mean_v_rad = np.mean(v_rad)
+
+    # Subtract this coherent drift from every atom's radial velocity
+    v_rad_fluctuation = v_rad - mean_v_rad
+
+    # Re-calculate Total Kinetic Energy using the FLUCTUATIONS only
+    corrected_sq_sum = np.sum(v_tan_sq + v_rad_fluctuation**2)
+    t_corrected = corrected_sq_sum / (2.0 * n_atoms)
+
+    return t_tot, t_corrected
+
+
+def _process_frame_temp(f, n_atoms):
+    """Reads frame atoms and computes temperatures."""
+    x, y, vx, vy = _read_frame_atoms(f, n_atoms)
+    return _compute_frame_temperature(x, y, vx, vy, n_atoms)
+
+
+
 def plot_temperatures(filename, output_dir=None, no_show=False):
+    """
+    Plots drift-corrected temperature from a LAMMPS dump file.
+    """
     timesteps = []
     total_temps = []
     corrected_temps = []  # Drift-Corrected (True Thermal)
 
-    # Define the center of the box
-    center_x = 100.0
-    center_y = 100.0
-
     print(f"Reading file: {filename}...")
+    n_atoms = 0
 
-    with open(filename, "r") as f:
+    with open(filename, "r", encoding="utf-8") as f:
         while True:
             line = f.readline()
             if not line:
@@ -101,74 +176,17 @@ def plot_temperatures(filename, output_dir=None, no_show=False):
                 step = int(f.readline().strip())
                 timesteps.append(step)
 
-            if "ITEM: NUMBER OF ATOMS" in line:
+            elif "ITEM: NUMBER OF ATOMS" in line:
                 n_atoms = int(f.readline().strip())
 
-            if "ITEM: ATOMS" in line:
-                # Store data for this frame to process in bulk
-                v_x_list = []
-                v_y_list = []
-                x_list = []
-                y_list = []
+            elif "ITEM: ATOMS" in line:
+                if n_atoms == 0:
+                    # Skip header or malformed frame
+                    continue
 
-                for _ in range(n_atoms):
-                    atom_data = f.readline().split()
-                    x_list.append(float(atom_data[2]))
-                    y_list.append(float(atom_data[3]))
-                    v_x_list.append(float(atom_data[4]))
-                    v_y_list.append(float(atom_data[5]))
-
-                # Convert to numpy arrays for vector math
-                x = np.array(x_list)
-                y = np.array(y_list)
-                vx = np.array(v_x_list)
-                vy = np.array(v_y_list)
-
-                # --- 1. Calculate Radial and Tangential Components ---
-                dx = x - center_x
-                dy = y - center_y
-                dist = np.sqrt(dx**2 + dy**2)
-
-                # Avoid division by zero
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    rx = dx / dist
-                    ry = dy / dist
-                    # Handle exact center case
-                    rx[dist == 0] = 0
-                    ry[dist == 0] = 0
-
-                # Radial Velocity (Scalar) for each atom
-                v_rad = vx * rx + vy * ry
-
-                # Tangential Velocity Vectors
-                v_tan_x = vx - (v_rad * rx)
-                v_tan_y = vy - (v_rad * ry)
-
-                # --- 2. Calculate "Standard" Total Temperature ---
-                # Raw KE = 0.5 * m * (vx^2 + vy^2)
-                # T = Sum(v^2) / (2 * N)  [2 Degrees of Freedom]
-                total_sq_sum = np.sum(vx**2 + vy**2)
-                t_tot = total_sq_sum / (2.0 * n_atoms)
+                t_tot, t_corr = _process_frame_temp(f, n_atoms)
                 total_temps.append(t_tot)
-
-                # --- 3. Calculate Drift-Corrected Temperature ---
-                # Calculate the Mean Radial Velocity (The "Bulk Implosion Speed")
-                # This is the velocity added by the force that we want to remove.
-                mean_v_rad = np.mean(v_rad)
-
-                # Subtract this coherent drift from every atom's radial velocity
-                # We essentially shift the reference frame to move with the implosion.
-                v_rad_fluctuation = v_rad - mean_v_rad
-
-                # Re-calculate Total Kinetic Energy using the FLUCTUATIONS only
-                # KE_corrected = KE_tangential + KE_radial_fluctuation
-
-                v_tan_sq = v_tan_x**2 + v_tan_y**2
-                v_rad_fluc_sq = v_rad_fluctuation**2
-
-                corrected_sq_sum = np.sum(v_tan_sq + v_rad_fluc_sq)
-                t_corrected = corrected_sq_sum / (2.0 * n_atoms)
-                corrected_temps.append(t_corrected)
+                corrected_temps.append(t_corr)
 
     # Plotting
     plt.figure(figsize=(10, 6))
@@ -209,11 +227,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Plot drift-corrected temperature from LAMMPS trajectory"
     )
-    ex = "/home/austin/git/molecular-dynamics-simulation/lammps-scripts/test_same/test.in_100_5.0.lammpstrj"
-    # ex = '/home/austin/git/molecular-dynamics-simulation/lammps-scripts/test_same/logs/test.in_100_5.0.log'
+    ex = (
+        "/home/austin/git/molecular-dynamics-simulation/"
+        "lammps-scripts/test_same/test.in_100_5.0.lammpstrj"
+    )
+
+    # ex = '.../test_same/logs/test.in_100_5.0.log'
     parser.add_argument("--filename", "-f", default=ex, help="Path to file")
     parser.add_argument("--output_dir", default=None, help="Output directory")
-    parser.add_argument("--no-show", action="store_true", help="Do not display the graph")
+    parser.add_argument(
+        "--no-show", action="store_true", help="Do not display the graph"
+    )
     args = parser.parse_args()
     if args.filename.endswith(".log"):
         plot_log_temperature(args.filename, args.output_dir, args.no_show)

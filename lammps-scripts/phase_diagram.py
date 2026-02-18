@@ -1,3 +1,8 @@
+"""
+This module processes LAMMPS trajectory files to generate a phase diagram based on
+hexatic order parameters.
+"""
+
 import argparse
 import glob
 import os
@@ -11,7 +16,7 @@ from hexatic_order_analysis import parse_and_calc_hexatic
 def extract_epsilon_and_molecules(filename):
     """
     Extracts the epsilon and molecules values from the filename.
-    Expected format: 
+    Expected format:
       - *.in_{molecules}_{epsilon}.lammpstrj (Old format)
       - *_{molecules}_{epsilon}.lammpstrj (New format)
     """
@@ -30,6 +35,7 @@ def extract_epsilon_and_molecules(filename):
         return molecules, epsilon
 
     return None, None
+
 
 
 def test_single_file(filename):
@@ -56,33 +62,53 @@ def test_single_file(filename):
     print(f"  Total frames: {len(values)}")
 
 
-def generate_stability_plot(data_dir, pattern, verbose):
-    """Generate a phase diagram plot based on hexatic order analysis."""
-    file_pattern = os.path.join(data_dir, pattern)
-    filenames = glob.glob(file_pattern)
-
+def collect_phase_data(filenames, verbose):
+    """
+    Collects phase data (epsilon, molecules, psi6) from files.
+    Returns three lists: epsilons, num_molecules, avg_psi6_list.
+    """
     epsilons = []
     num_molecules = []
-    avg_psi6 = []
-    if verbose:
-        print(filenames)
+    avg_psi6_list = []
+
     for fname in filenames:
         n_mols, eps = extract_epsilon_and_molecules(fname)
         if eps is None or n_mols is None:
             if verbose:
-                print(fname)
+                print(f"Skipping invalid filename: {fname}")
             continue
 
         # Use your existing function to get timesteps and psi6 values
-        # Assuming values is a 2D array: [timestep, particle_index]
         _, values = parse_and_calc_hexatic(fname, verbose)
+
+        if not values:
+            if verbose:
+                print(f"No data found in: {fname}")
+            continue
 
         # We take the mean of the last frame to represent the "stable" state
         final_frame_psi6 = np.mean(values[-1])
 
         epsilons.append(eps)
         num_molecules.append(n_mols)
-        avg_psi6.append(final_frame_psi6)
+        avg_psi6_list.append(final_frame_psi6)
+
+    return epsilons, num_molecules, avg_psi6_list
+
+
+def generate_stability_plot(data_dir, pattern, verbose):
+    """Generate a phase diagram plot based on hexatic order analysis."""
+    file_pattern = os.path.join(data_dir, pattern)
+    filenames = glob.glob(file_pattern)
+
+    if verbose:
+        print(f"Found {len(filenames)} files.")
+
+    epsilons, num_molecules, _avg_psi6 = collect_phase_data(filenames, verbose)
+
+    if not epsilons:
+        print("No valid data found to plot.")
+        return
 
     # Get max values
     max_epsilon = max(epsilons) * 1.05  # add 5% buffer to graph
@@ -93,7 +119,7 @@ def generate_stability_plot(data_dir, pattern, verbose):
     scatter = plt.scatter(
         epsilons,
         num_molecules,
-        c=avg_psi6,
+        c=_avg_psi6,
         cmap="RdYlGn",
         s=100,
         edgecolor="black",

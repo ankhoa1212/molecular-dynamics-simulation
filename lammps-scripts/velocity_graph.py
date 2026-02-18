@@ -25,7 +25,7 @@ def _process_velocity_data(filename):
     for frame in parse_lammps_dump(filename):
         timesteps.append(frame["timestep"])
         atom_lines = frame["atoms"]
-        
+
         # Parse atom header to find column indices
         atom_header = frame["atom_header"]
         # Format is usually "ITEM: ATOMS id type x y vx vy"
@@ -47,7 +47,7 @@ def _process_velocity_data(filename):
                 vx = float(parts[vx_idx])
                 vy = float(parts[vy_idx])
                 raw_data.append(np.sqrt(vx**2 + vy**2))
-        
+
         if raw_data:
             avg_velocities.append(np.mean(raw_data))
             std_velocities.append(np.std(raw_data))
@@ -98,7 +98,7 @@ def plot_velocity_over_time(filename, output_dir, no_show=False):
         plt.show()
 
 
-# Replace 'your_file.lammpstrj' with your actual filename
+# Replace 'your_file.lammpstrj' w/actual filename
 # plot_velocity_over_time('your_file.lammpstrj')
 
 if __name__ == "__main__":

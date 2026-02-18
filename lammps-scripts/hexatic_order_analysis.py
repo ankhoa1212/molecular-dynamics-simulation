@@ -16,7 +16,7 @@ def _process_box(box_lines):
     """Parses box bounds from list of strings."""
     x_range = [float(x) for x in box_lines[0].split()]
     y_range = [float(y) for y in box_lines[1].split()]
-    
+
     box_lx = x_range[1] - x_range[0]
     box_ly = y_range[1] - y_range[0]
     return freud.Box(Lx=box_lx, Ly=box_ly, is2D=True)

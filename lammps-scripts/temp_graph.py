@@ -152,6 +152,12 @@ def _compute_frame_temperature(x, y, vx, vy, n_atoms):
     return t_tot, t_corrected
 
 
+def _calculate_temps_for_frame(frame):
+    """calculates temperature for a single frame"""
+    x, y, vx, vy = _process_atom_lines(frame["atoms"])
+    return _compute_frame_temperature(x, y, vx, vy, frame["n_atoms"])
+
+
 def plot_temperatures(filename, output_dir=None, no_show=False):
     """
     Plots drift-corrected temperature from a LAMMPS dump file.
@@ -164,16 +170,12 @@ def plot_temperatures(filename, output_dir=None, no_show=False):
 
     try:
         for frame in parse_lammps_dump(filename):
-            step = frame["timestep"]
-            n_atoms = frame["n_atoms"]
-
-            if n_atoms == 0:
+            if frame["n_atoms"] == 0:
                 continue
 
-            x, y, vx, vy = _process_atom_lines(frame["atoms"])
-            t_tot, t_corr = _compute_frame_temperature(x, y, vx, vy, n_atoms)
-            
-            timesteps.append(step)
+            t_tot, t_corr = _calculate_temps_for_frame(frame)
+
+            timesteps.append(frame["timestep"])
             total_temps.append(t_tot)
             corrected_temps.append(t_corr)
 

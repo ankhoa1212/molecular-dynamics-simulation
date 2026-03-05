@@ -1,135 +1,116 @@
 """
-graph.py
-This module processes molecular dynamics simulation output files (LAMMPS dump format),
-extracts atomic data, and generates a CSV file for further analysis. It also provides
-visualization of the average velocity magnitude per timestep using matplotlib.
-Functions:
-    check_is_float(value):
-        Checks if the given value can be converted to a float.
-    check_is_int(value):
-        Checks if the given value can be converted to an integer.
-    generate_csv(filename, csv_filename):
-        Reads a LAMMPS dump file, extracts atomic data for each timestep,
-        and saves it as a CSV file with appropriate columns.
-Script Usage:
-    python graph.py <filename>
-        - If a corresponding CSV file does not exist, it will be generated from the raw file.
-        - If the CSV exists, it will be loaded for analysis.
-        - The script computes and plots the average velocity magnitude ('vx', 'vy') per timestep.
+This module serves as a wrapper to run multiple analysis scripts
+(hexatic_order_graph.py, velocity_graph.py, temp_graph.py) on LAMMPS
+trajectory files. It can process individual files or directories of files.
 """
+
+import argparse
 import os
+import subprocess
 import sys
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-# import mdtraj as md
+from pathlib import Path
 
 
-def check_is_float(value):
-    """ Check if a value is a float """
-    try:
-        float(value)
-        return True
-    except ValueError:
-        return False
+def run_script(script_name, file_path, output_dir=None, no_show=False):
+    """
+    Executes a single analysis script on the target file.
 
-def check_is_int(value):
-    """ Check if a value is an integer """
-    try:
-        int(value)
-        return True
-    except ValueError:
-        return False
+    Args:
+        script_name (str): The name of the Python script to run.
+        file_path (str or Path): Path to the input file (e.g. .lammpstrj).
+        output_dir (str or Path, optional): Directory to save output.
+        no_show (bool, optional): If True, suppresses plot display.
+    """
+    # Resolve script path relative to this script's location
+    script_dir = Path(__file__).resolve().parent
+    script_path = script_dir / script_name
 
-def generate_csv(filename, csv_filename):
-    """ Generate a CSV file from a LAMMPS dump file """
-    print(f"Opening file {filename}...")
-    read_data, read_time = False, False
-    data = pd.DataFrame()
-    with open(filename, "r", encoding="utf-8") as file:
-        lines = file.readlines()
-        print(f"Reading data from {filename}...")
-        values = None
-        timestep = None
-        for line in lines:
-            if line.startswith("ITEM:"):
-                if line.startswith("ITEM: TIMESTEP"):
-                    read_time = True
-                    read_data = False
-                elif line.startswith("ITEM: ATOMS"):
-                    # set values to column names, skip the first 12 characters "ITEM: ATOMS ""
-                    if not values:
-                        values = line[12:].split()
-                        values.append("timestep")
-                        data = pd.DataFrame(columns=values)
-                        print(values)
-                    read_data = True
-                continue
-            if read_time:
-                timestep = line
-                read_time = False
-                print(f"timestep: {timestep}")
-            elif read_data:
-                input_line = line.split()
-                input_line.append(timestep)
-                temp_data = []
-                for value in input_line:
-                    if check_is_float(value):
-                        temp_data.append(float(value))
-                    elif check_is_int(value):
-                        temp_data.append(int(value))
-                    else:
-                        temp_data.append(value)
-                print(
-                    f"Adding data at timestep {timestep}: {len(temp_data)} {temp_data}"
-                )
-                data.loc[len(data)] = temp_data
+    cmd = ["python3", str(script_path)]
 
-        # Save the dataframe to a CSV file
-        data.to_csv(csv_filename, index=False)
-        print(f"Data saved to {csv_filename}")
-        return data
-
-def read_data_from_file():
-    """ Read data from a file or generate a CSV if it doesn't exist """
-    # Read data from a raw file
-    if len(sys.argv) < 2:
-        print("Usage: python graph.py <filename>")
-        sys.exit(1)
-
-    filename = sys.argv[1]
-
-    data = pd.DataFrame()
-
-    csv_file = filename.rsplit(".", 1)[0] + ".csv"
-    if os.path.exists(csv_file):
-        print(f"CSV file {csv_file} found.")
-        print("Reading in csv data...")
-        data = pd.read_csv(csv_file)
+    if script_name == "hexatic_order_graph.py":
+        cmd.append(str(file_path))
     else:
-        data = generate_csv(filename, csv_file)
-    return data, filename
+        cmd.extend(["--filename", str(file_path)])
 
-def create_plots(data, filename):
-    """ Create plots from the data """
-    print("Creating plots...")
-    if "vx" in data.columns and "vy" in data.columns and "timestep" in data.columns:
-        data["v_mag"] = np.sqrt(data["vx"] ** 2 + data["vy"] ** 2)
-        avg_vmag = data.groupby("timestep")["v_mag"].mean()
-        plt.figure()
-        plt.plot(avg_vmag.index, avg_vmag.values, marker="o")
-        plt.xlabel("Timestep")
-        plt.ylabel("Average Velocity Magnitude")
-        plt.title("Average Velocity Magnitude per Timestep")
-        plt.savefig(filename.rsplit(".", 1)[0] + "_avg_velocity_magnitude.png")
-        plt.show()
-    else:
-        print("Required columns ('vx', 'vy', 'timestep') not found in data.")
+    if output_dir:
+        cmd.extend(["--output_dir", str(output_dir)])
+
+    if no_show:
+        cmd.append("--no-show")
+
+    print(f"Running {script_name} on {file_path}...")
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running {script_name}: {e}")
+
+
+def process_file(file_path, output_dir=None, no_show=False):
+    """
+    Runs all analysis scripts on a single LAMMPS trajectory file.
+
+    Args:
+        file_path (str or Path): Path to the input file.
+        output_dir (str or Path, optional): Directory to save output.
+        no_show (bool, optional): If True, suppresses plot display.
+    """
+    scripts = ["hexatic_order_graph.py", "velocity_graph.py", "temp_graph.py"]
+    for script in scripts:
+        run_script(script, file_path, output_dir, no_show)
+
 
 def main():
-    """ Main function to execute the script """
-    data, filename = read_data_from_file()
-    create_plots(data, filename)
+    """
+    Main function to parse arguments and run the analysis scripts.
+    It supports processing a single file or a directory.
+    """
+    parser = argparse.ArgumentParser(
+        description="Run analysis scripts on LAMMPS trajectory files."
+    )
+    parser.add_argument(
+        "input_path", help="Path to a .lammpstrj file or a directory containing them."
+    )
+    parser.add_argument(
+        "--output_dir",
+        "-o",
+        default=None,
+        help="Optional output directory for graphs.",
+    )
+    parser.add_argument(
+        "--no-show",
+        action="store_true",
+        help="Do not display the graphs interactively.",
+    )
+    args = parser.parse_args()
+
+    input_path = Path(args.input_path)
+    output_dir = args.output_dir
+    no_show = args.no_show
+
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    if input_path.is_file():
+        if input_path.suffix == ".lammpstrj":
+            process_file(input_path, output_dir, no_show)
+        else:
+            print(f"Error: {input_path} is not a .lammpstrj file.")
+            sys.exit(1)
+
+    elif input_path.is_dir():
+        files = sorted(list(input_path.glob("*.lammpstrj")))
+        if not files:
+            print(f"No .lammpstrj files found in {input_path}")
+            sys.exit(0)
+
+        print(f"Found {len(files)} files processing...")
+        for f in files:
+            process_file(f, output_dir, no_show)
+
+    else:
+        print(f"Error: {input_path} does not exist.")
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

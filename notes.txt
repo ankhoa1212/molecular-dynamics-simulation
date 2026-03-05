@@ -1,0 +1,12 @@
+crystal --> stable --> molecules form structure instantly
+crsystal --> meta-stable --> molecules slowly form structure
+liquid --> molecules don't come together
+
+vary the number of molecules and the strength
+visually check and provide reasoning for why the crystallization is classified in a certain way
+graph a phase diagram based on different parameters
+
+YOLO --> understand basics for training from scratch
+
+train a new dataset
+talk to Julianna about training dataset

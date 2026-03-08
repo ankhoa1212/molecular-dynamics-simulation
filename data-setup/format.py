@@ -6,6 +6,7 @@ import os
 import cv2
 import numpy as np
 import tifffile
+from tqdm import tqdm
 
 
 def convert_jpg_to_frames(input_path, output_folder, image_format="png"):
@@ -17,7 +18,7 @@ def convert_jpg_to_frames(input_path, output_folder, image_format="png"):
         if not jpg_files:
             print(f"No .jpg files found in directory: {input_path}")
             return
-        for fname in jpg_files:
+        for fname in tqdm(jpg_files, desc="Converting JPGs"):
             base = os.path.splitext(fname)[0]
             convert_jpg_to_frames(
                 os.path.join(input_path, fname),
@@ -43,12 +44,12 @@ def convert_tif_to_frames(input_path, output_folder, image_format="png", nth=10)
     # If input_path is a directory, find .tif files and process each
     if os.path.isdir(input_path):
         tif_files = sorted(
-            [f for f in os.listdir(input_path) if f.lower().endswith(".tif")]
+            [f for f in os.listdir(input_path) if f.lower().endswith((".tif", ".tiff"))]
         )
         if not tif_files:
-            print(f"No .tif files found in directory: {input_path}")
+            print(f"No .tif/.tiff files found in directory: {input_path}")
             return
-        for fname in tif_files:
+        for fname in tqdm(tif_files, desc="Converting TIFs"):
             base = os.path.splitext(fname)[0]
             out_subdir = os.path.join(output_folder, f"{base}_frames")
             os.makedirs(out_subdir, exist_ok=True)
@@ -75,7 +76,8 @@ def convert_tif_to_frames(input_path, output_folder, image_format="png", nth=10)
 
     # 3. Iterate through frames and save every nth frame
     saved_count = 0
-    for i in range(0, len(tiff_stack), nth):
+    frame_indices = range(0, len(tiff_stack), nth)
+    for i in tqdm(frame_indices, desc=f"Saving frames", unit="frame"):
         frame = tiff_stack[i]
 
         # 4. Normalization
@@ -104,10 +106,7 @@ INPUT_PATH = (
     "Au Cit+1% of 2um PS+NaCl 20% Light Intensity Test Video 300 ms Trial 17_1"
 )
 
-# create output directory in current working directory based on input_path name
-base_name = os.path.splitext(os.path.basename(INPUT_PATH))[0]
-output_dir = os.path.join(os.getcwd(), f"{base_name}_frames")
-os.makedirs(output_dir, exist_ok=True)
+
 
 
 if __name__ == "__main__":
@@ -122,13 +121,13 @@ if __name__ == "__main__":
         help="Path to input .tif file or a directory containing .tif files",
     )
     parser.add_argument(
-        "output_dir", nargs="?", default=output_dir, help="Directory to save frames"
+        "output_dir", nargs="?", default=None, help="Directory to save frames"
     )
     parser.add_argument(
-        "convert_jpg",
-        type=bool,
-        default=False,
-        help="Set to True to convert JPG images instead of TIFF",
+        "--jpg",
+        action="store_true",
+        dest="convert_jpg",
+        help="Convert JPG images instead of TIFF",
     )
     parser.add_argument(
         "-n",
@@ -146,6 +145,11 @@ if __name__ == "__main__":
         help="Output image format (default: png)",
     )
     args = parser.parse_args()
+
+    if args.output_dir is None:
+        base_name = os.path.splitext(os.path.basename(args.input_path))[0]
+        args.output_dir = os.path.join(os.getcwd(), f"{base_name}_frames")
+    os.makedirs(args.output_dir, exist_ok=True)
 
     if args.convert_jpg:
         convert_jpg_to_frames(args.input_path, args.output_dir, args.image_format)

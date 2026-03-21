@@ -1,5 +1,5 @@
 """
-Rewrite of autolabeler.py to use LodeSTAR for generating YOLO labels on TIFF files.
+Use LodeSTAR for generating YOLO labels on TIFF files.
 Recursively searches for .tif/.tiff files, extracts nth frames, and generates YOLO labels.
 Output structure mimics RoboFlow: <filename>_dataset/{images, labels}/
 """

@@ -1,7 +1,5 @@
 """Train a LodeSTAR model and save weights + companion JSON config."""
 import argparse
-import dataclasses
-import glob
 import json
 import logging
 import os
@@ -10,7 +8,7 @@ import random
 import mlflow
 import numpy as np
 import torch
-from PIL import Image
+from PIL import Image, ImageOps
 from pytorch_lightning.loggers import MLFlowLogger
 from tqdm import tqdm
 
@@ -59,13 +57,14 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Train a LodeSTAR model and save it for later inference."
     )
-    parser.add_argument(
-        "--input-dir", type=str,
-        help="Directory containing input images.",
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--input-dir", type=str, nargs="+",
+        help="One or more directories containing input images.",
     )
-    parser.add_argument(
-        "--input-file", type=str,
-        help="Path to a single input image.",
+    group.add_argument(
+        "--input-file", type=str, nargs="+",
+        help="One or more paths to individual input images.",
     )
     parser.add_argument(
         "--model-path", type=str, default=None,
@@ -83,12 +82,12 @@ def parse_args():
         help="Number of geometric transforms for LodeSTAR equivariance.",
     )
     parser.add_argument(
-        "--epochs", type=int, default=50,
+        "--epochs", type=int, default=100,
         help="Number of max epochs for training LodeSTAR.",
     )
     parser.add_argument(
         "--crop-size", type=int, default=64,
-        help="Resize all loaded crops to this square size before training (default: 64).",
+        help="Target square size for crops: centre-pad if smaller, centre-crop if larger (default: 64).",
     )
     parser.add_argument(
         "--batch-size", type=int, default=8,
@@ -115,42 +114,44 @@ def parse_args():
         help="MLflow tracking URI (local path or remote).",
     )
     parser.add_argument(
-        "--patience", type=int, default=10,
+        "--patience", type=int, default=15,
         help=(
             "Early-stopping patience: stop when both within_image_disagreement "
             "and between_image_disagreement show no improvement for this many epochs."
         ),
     )
     parser.add_argument(
-        "--min-delta", type=float, default=1e-4,
+        "--min-delta", type=float, default=0.005,
         help="Minimum decrease in a loss to count as an improvement.",
     )
     parser.add_argument(
-        "--dataset-length", type=int, default=128,
-        help="Number of augmented samples generated per crop per epoch.",
+        "--dataset-length", type=int, default=None,
+        help=(
+            "Augmented samples generated per crop per epoch. "
+            "Defaults to 1024 for ≤5 crops, 512 for ≤20, 256 otherwise."
+        ),
     )
     return parser.parse_args()
 
 
-def _load_and_normalise(image_files):
-    raw_images = []
-    for fpath in image_files:
-        img = Image.open(fpath).convert("L")
-        raw_images.append(np.array(img))
-    data_raw = np.array(raw_images)
-    data = np.zeros_like(data_raw, dtype=np.float32)
-    for idx, frame in enumerate(data_raw):
-        frame_f = frame.astype(np.float32)
-        f_min, f_ptp = frame_f.min(), np.ptp(frame_f)
-        data[idx] = (frame_f - f_min) / f_ptp if f_ptp != 0 else frame_f - f_min
-    return data
+def _pad_to_square(img: Image.Image, size: int) -> Image.Image:
+    """Centre-crop oversized axes then zero-pad to exactly size×size."""
+    w, h = img.size
+    if w > size or h > size:
+        left = max((w - size) // 2, 0)
+        top  = max((h - size) // 2, 0)
+        img  = img.crop((left, top, left + min(w, size), top + min(h, size)))
+        w, h = img.size
+    pad_l = (size - w) // 2
+    pad_t = (size - h) // 2
+    return ImageOps.expand(img, border=(pad_l, pad_t, size - w - pad_l, size - h - pad_t), fill=0)
 
 
 def _load_crops(image_files, crop_size=64):
-    """Load, resize to crop_size×crop_size, and normalise crop images."""
+    """Load, pad/centre-crop to crop_size×crop_size, and normalise crop images."""
     crops = []
     for fpath in image_files:
-        img = Image.open(fpath).convert("L").resize((crop_size, crop_size), Image.LANCZOS)
+        img = _pad_to_square(Image.open(fpath).convert("L"), crop_size)
         arr = np.array(img, dtype=np.float32)
         arr_ptp = np.ptp(arr)
         crops.append((arr - arr.min()) / (arr_ptp if arr_ptp else 1.0))
@@ -194,17 +195,6 @@ def _unique_model_path(path):
         counter += 1
 
 
-def _collect_image_files(args):
-    if args.input_file:
-        if os.path.exists(args.input_file):
-            return [args.input_file]
-        print(f"File not found: {args.input_file}")
-        return []
-    all_files = sorted(glob.glob(os.path.join(args.input_dir, "*.*")))
-    valid_exts = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
-    return [f for f in all_files if os.path.splitext(f)[1].lower() in valid_exts]
-
-
 def _build_and_train(args, crops_data):
     if not crops_data:
         raise ValueError("No crops found — run crop_tool.py to create crops first.")
@@ -218,7 +208,7 @@ def _build_and_train(args, crops_data):
     ).build()
 
     datasets = [
-        dt.pytorch.Dataset(_make_pipeline(crop), length=args.dataset_length, replace=False)
+        dt.pytorch.Dataset(_make_pipeline(crop), length=args.dataset_length, replace=True)
         for crop in crops_data
     ]
     dataloader = dl.DataLoader(
@@ -232,14 +222,25 @@ def _build_and_train(args, crops_data):
         tracking_uri=args.mlflow_uri,
         run_id=mlflow.active_run().info.run_id if mlflow.active_run() else None,
     )
+    if len(crops_data) == 1:
+        print(
+            "Warning: only 1 crop provided. between_image_disagreement is meaningless "
+            "with a single source image; early stopping will monitor only "
+            "within_image_disagreement."
+        )
+        stopping_metrics = ["within_image_disagreement"]
+    else:
+        stopping_metrics = ["within_image_disagreement", "between_image_disagreement"]
+
     early_stop = _DualEarlyStopping(
-        metrics=["within_image_disagreement", "between_image_disagreement"],
+        metrics=stopping_metrics,
         patience=args.patience,
         min_delta=args.min_delta,
     )
+    precision = "16-mixed" if torch.cuda.is_available() else "32-true"
     dl.Trainer(
         accelerator="auto",
-        precision="16-mixed",
+        precision=precision,
         max_epochs=args.epochs,
         log_every_n_steps=10,
         logger=mlf_logger,
@@ -251,9 +252,6 @@ def _build_and_train(args, crops_data):
 def main():
     args = parse_args()
 
-    if not args.input_dir and not args.input_file:
-        raise ValueError("Either --input-dir or --input-file must be provided.")
-
     if args.model_path is None:
         models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
         os.makedirs(models_dir, exist_ok=True)
@@ -264,24 +262,68 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
 
-    base_dir = args.input_dir if args.input_dir else os.path.dirname(os.path.abspath(args.input_file))
-    crops_dir = os.path.join(base_dir, "crops")
-    if not os.path.isdir(crops_dir):
-        print(f"Crops directory not found: {crops_dir}")
-        print("Use crop_tool.py to manually create crops before training.")
-        return
-
+    # Aggregate crop files from all sources
+    crop_files_set = set()
     valid_exts = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
-    crop_files = sorted(
-        os.path.join(crops_dir, fn)
-        for fn in os.listdir(crops_dir)
-        if os.path.splitext(fn)[1].lower() in valid_exts
-    )
+    
+    source_dirs = []
+    if args.input_dir:
+        source_dirs = args.input_dir
+    elif args.input_file:
+        # If specific files are given, use their parent directories as source_dirs
+        # for logging purposes in MLflow.
+        source_dirs = list(set(os.path.dirname(os.path.abspath(f)) for f in args.input_file))
+        for f in args.input_file:
+            if os.path.isfile(f) and os.path.splitext(f)[1].lower() in valid_exts:
+                crop_files_set.add(os.path.abspath(f))
+
+    if args.input_dir:
+        for base_dir in source_dirs:
+            # Check base directory directly
+            found_base = [
+                os.path.join(base_dir, fn)
+                for fn in os.listdir(base_dir)
+                if os.path.isfile(os.path.join(base_dir, fn)) and os.path.splitext(fn)[1].lower() in valid_exts
+            ]
+            if found_base:
+                print(f"Found {len(found_base)} image(s) in {base_dir}")
+                for f in found_base:
+                    crop_files_set.add(os.path.abspath(f))
+
+            # Also check 'crops' subdirectory
+            crops_dir = os.path.join(base_dir, "crops")
+            if os.path.isdir(crops_dir):
+                found_crops = [
+                    os.path.join(crops_dir, fn)
+                    for fn in os.listdir(crops_dir)
+                    if os.path.isfile(os.path.join(crops_dir, fn)) and os.path.splitext(fn)[1].lower() in valid_exts
+                ]
+                if found_crops:
+                    print(f"Found {len(found_crops)} image(s) in {crops_dir}")
+                    for f in found_crops:
+                        crop_files_set.add(os.path.abspath(f))
+            elif not found_base:
+                print(f"Warning: No images found in {base_dir} or {crops_dir}")
+
+    crop_files = sorted(list(crop_files_set))
+
     if not crop_files:
-        print(f"No images found in crops directory: {crops_dir}")
+        print("No crops found across all sources. Use crop_tool.py to manually create crops before training.")
         return
-    print(f"Found {len(crop_files)} crop image(s) in {crops_dir}")
+    
+    # Sort for reproducibility
+    crop_files.sort()
+    print(f"Total: Found {len(crop_files)} crop image(s) for training.")
+
+    if args.dataset_length is None:
+        if len(crop_files) <= 5:
+            args.dataset_length = 1024
+        elif len(crop_files) <= 20:
+            args.dataset_length = 512
+        else:
+            args.dataset_length = 256
 
     run_name = args.run_name or os.path.splitext(os.path.basename(args.model_path))[0]
     mlflow.set_tracking_uri(args.mlflow_uri)
@@ -296,7 +338,7 @@ def main():
             "num_outputs": args.num_outputs,
             "seed": args.seed,
             "num_crops": len(crop_files),
-            "crops_dir": crops_dir,
+            "source_dirs": ", ".join(source_dirs),
             "patience": args.patience,
             "min_delta": args.min_delta,
             "dataset_length": args.dataset_length,

@@ -23,15 +23,13 @@ Edit Mode:
 
 from __future__ import annotations
 
-import os
 import re
 import sys
+import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Optional
-import threading
-from collections import deque
 
 import numpy as np
 from PIL import Image, ImageTk
@@ -44,8 +42,8 @@ MIN_CROP_PX = 5
 ZOOM_STEP = 1.15
 ZOOM_MIN = 0.05
 ZOOM_MAX = 30.0
-HANDLE_RADIUS = 6    # display half-size of corner handle squares (canvas px)
-HANDLE_HIT    = 12   # hit-detection half-size for corner handles (canvas px)
+HANDLE_RADIUS = 6  # display half-size of corner handle squares (canvas px)
+HANDLE_HIT = 12  # hit-detection half-size for corner handles (canvas px)
 
 
 class CropTool:
@@ -65,11 +63,11 @@ class CropTool:
 
         # ── Transform state ──────────────────────────────────────────────────
         # display_coord = image_coord * display_scale + offset + pan
-        self.zoom_level: float = 1.0     # relative to fit-to-canvas scale
-        self.pan_x: float = 0.0          # canvas-space additional offset
+        self.zoom_level: float = 1.0  # relative to fit-to-canvas scale
+        self.pan_x: float = 0.0  # canvas-space additional offset
         self.pan_y: float = 0.0
-        self.fit_scale: float = 1.0      # scale that fits image into canvas
-        self.img_offset_x: float = 0.0   # letterbox margin
+        self.fit_scale: float = 1.0  # scale that fits image into canvas
+        self.img_offset_x: float = 0.0  # letterbox margin
         self.img_offset_y: float = 0.0
 
         # ── Internal rendering ───────────────────────────────────────────────
@@ -87,16 +85,18 @@ class CropTool:
         # Each entry: (x1, y1, x2, y2, Optional[Path])
         # Coordinates are image-space pixels. Path points to the PNG crop if it exists.
         self._manual_annots: list[tuple[int, int, int, int, Optional[Path]]] = []
-        self._yolo_labels: list[tuple[int, int, int, int, int]] = [] # (x1, y1, x2, y2, class_id)
+        self._yolo_labels: list[tuple[int, int, int, int, int]] = (
+            []
+        )  # (x1, y1, x2, y2, class_id)
         self._yolo_view_mode: str = "box"  # 'box' | 'point'
-        self._save_crops_mode: bool = False # If True, generate PNG snippets
+        self._save_crops_mode: bool = False  # If True, generate PNG snippets
         self._undo_stack: list[dict] = []
 
         # ── Edit mode state ──────────────────────────────────────────────────
         self._edit_mode: bool = False
         self._selected_type: str = "manual"  # 'manual' | 'yolo'
         self._selected_idx: Optional[int] = None
-        self._edit_drag_mode: Optional[str] = None   # 'move' | 'resize_nw' | etc.
+        self._edit_drag_mode: Optional[str] = None  # 'move' | 'resize_nw' | etc.
         self._edit_drag_start_canvas: Optional[tuple[int, int]] = None
         self._edit_drag_crop_orig: Optional[tuple[int, int, int, int]] = None
 
@@ -146,23 +146,27 @@ class CropTool:
         _sep(toolbar)
 
         self._btn_edit_mode = tk.Button(
-            toolbar, text="Edit Mode (E)", command=self.toggle_edit_mode,
+            toolbar,
+            text="Edit Mode (E)",
+            command=self.toggle_edit_mode,
             relief=tk.RAISED,
         )
         self._btn_edit_mode.pack(side=tk.LEFT, padx=2, pady=3)
 
         self._btn_delete = tk.Button(
-            toolbar, text="Delete Selected (Del)", command=self.delete_selected_crop,
+            toolbar,
+            text="Delete Selected (Del)",
+            command=self.delete_selected_crop,
             state=tk.DISABLED,
         )
         self._btn_delete.pack(side=tk.LEFT, padx=2, pady=3)
         _sep(toolbar)
-        
+
         self._btn_yolo_mode = tk.Button(
             toolbar, text="YOLO: Box (Y)", command=self.toggle_yolo_view_mode
         )
         self._btn_yolo_mode.pack(side=tk.LEFT, padx=2, pady=3)
-        
+
         self._btn_save_crops = tk.Button(
             toolbar, text="Crops: Off (C)", command=self.toggle_save_crops_mode
         )
@@ -170,13 +174,16 @@ class CropTool:
         _sep(toolbar)
 
         self._btn_convert = tk.Button(
-            toolbar, text="Convert to Crop (T)", command=self.convert_selected, state=tk.DISABLED
+            toolbar,
+            text="Convert to Crop (T)",
+            command=self.convert_selected,
+            state=tk.DISABLED,
         )
         self._btn_convert.pack(side=tk.LEFT, padx=2, pady=3)
 
-        tk.Button(
-            toolbar, text="Convert All YOLO", command=self.convert_all_yolo
-        ).pack(side=tk.LEFT, padx=2, pady=3)
+        tk.Button(toolbar, text="Convert All YOLO", command=self.convert_all_yolo).pack(
+            side=tk.LEFT, padx=2, pady=3
+        )
 
         # Canvas
         self.canvas = tk.Canvas(
@@ -200,13 +207,13 @@ class CropTool:
         root, canvas = self.root, self.canvas
 
         # Navigation
-        root.bind("<Left>",  lambda _: self.prev_image())
+        root.bind("<Left>", lambda _: self.prev_image())
         root.bind("<Right>", lambda _: self.next_image())
 
         # Zoom / reset
-        root.bind("<r>",     lambda _: self.reset_transform())
-        root.bind("<R>",     lambda _: self.reset_transform())
-        root.bind("<plus>",  lambda _: self.zoom_in())
+        root.bind("<r>", lambda _: self.reset_transform())
+        root.bind("<R>", lambda _: self.reset_transform())
+        root.bind("<plus>", lambda _: self.zoom_in())
         root.bind("<equal>", lambda _: self.zoom_in())
         root.bind("<minus>", lambda _: self.zoom_out())
 
@@ -214,30 +221,30 @@ class CropTool:
         root.bind("<Control-z>", lambda _: self.undo_last_crop())
 
         # Edit mode toggle / delete
-        root.bind("<e>",         lambda _: self.toggle_edit_mode())
-        root.bind("<E>",         lambda _: self.toggle_edit_mode())
-        root.bind("<Delete>",    lambda _: self.delete_selected_crop())
+        root.bind("<e>", lambda _: self.toggle_edit_mode())
+        root.bind("<E>", lambda _: self.toggle_edit_mode())
+        root.bind("<Delete>", lambda _: self.delete_selected_crop())
         root.bind("<BackSpace>", lambda _: self.delete_selected_crop())
-        root.bind("<y>",         lambda _: self.toggle_yolo_view_mode())
-        root.bind("<Y>",         lambda _: self.toggle_yolo_view_mode())
-        root.bind("<c>",         lambda _: self.toggle_save_crops_mode())
-        root.bind("<C>",         lambda _: self.toggle_save_crops_mode())
-        root.bind("<t>",         lambda _: self.convert_selected())
-        root.bind("<T>",         lambda _: self.convert_selected())
+        root.bind("<y>", lambda _: self.toggle_yolo_view_mode())
+        root.bind("<Y>", lambda _: self.toggle_yolo_view_mode())
+        root.bind("<c>", lambda _: self.toggle_save_crops_mode())
+        root.bind("<C>", lambda _: self.toggle_save_crops_mode())
+        root.bind("<t>", lambda _: self.convert_selected())
+        root.bind("<T>", lambda _: self.convert_selected())
 
         # Scroll-to-zoom: Linux Button-4/5, Windows/Mac MouseWheel
         canvas.bind("<MouseWheel>", self._on_mousewheel)
-        canvas.bind("<Button-4>",   self._on_mousewheel)
-        canvas.bind("<Button-5>",   self._on_mousewheel)
+        canvas.bind("<Button-4>", self._on_mousewheel)
+        canvas.bind("<Button-5>", self._on_mousewheel)
 
         # Right-click pan
-        canvas.bind("<ButtonPress-3>",   self._on_pan_start)
-        canvas.bind("<B3-Motion>",       self._on_pan_drag)
+        canvas.bind("<ButtonPress-3>", self._on_pan_start)
+        canvas.bind("<B3-Motion>", self._on_pan_drag)
         canvas.bind("<ButtonRelease-3>", self._on_pan_end)
 
         # Left-click rubber-band crop
-        canvas.bind("<ButtonPress-1>",   self._on_drag_start)
-        canvas.bind("<B1-Motion>",       self._on_drag_motion)
+        canvas.bind("<ButtonPress-1>", self._on_drag_start)
+        canvas.bind("<B1-Motion>", self._on_drag_motion)
         canvas.bind("<ButtonRelease-1>", self._on_drag_end)
 
         # Window resize
@@ -266,7 +273,9 @@ class CropTool:
 
     def toggle_yolo_view_mode(self) -> None:
         self._yolo_view_mode = "point" if self._yolo_view_mode == "box" else "box"
-        self._btn_yolo_mode.config(text=f"YOLO: {self._yolo_view_mode.capitalize()} (Y)")
+        self._btn_yolo_mode.config(
+            text=f"YOLO: {self._yolo_view_mode.capitalize()} (Y)"
+        )
         self._redraw()
         self._update_status()
 
@@ -276,11 +285,15 @@ class CropTool:
     def toggle_save_crops_mode(self) -> None:
         self._save_crops_mode = not self._save_crops_mode
         state = "On" if self._save_crops_mode else "Off"
-        self._btn_save_crops.config(text=f"Crops: {state} (C)", 
-                                  relief=tk.SUNKEN if self._save_crops_mode else tk.RAISED)
+        self._btn_save_crops.config(
+            text=f"Crops: {state} (C)",
+            relief=tk.SUNKEN if self._save_crops_mode else tk.RAISED,
+        )
         self._update_status()
 
-    def _find_crop_at(self, cx: float, cy: float) -> tuple[Optional[str], Optional[int]]:
+    def _find_crop_at(
+        self, cx: float, cy: float
+    ) -> tuple[Optional[str], Optional[int]]:
         """Return (type, index) of the topmost annotation whose canvas rect contains (cx, cy)."""
         # Check manual annotations first (they are on top)
         for i in range(len(self._manual_annots) - 1, -1, -1):
@@ -289,7 +302,7 @@ class CropTool:
             rx2, ry2 = self._image_to_canvas(x2, y2)
             if rx1 <= cx <= rx2 and ry1 <= cy <= ry2:
                 return "manual", i
-        
+
         # Check YOLO reference labels
         for i in range(len(self._yolo_labels) - 1, -1, -1):
             x1, y1, x2, y2, _ = self._yolo_labels[i]
@@ -297,7 +310,7 @@ class CropTool:
             rx2, ry2 = self._image_to_canvas(x2, y2)
             if rx1 <= cx <= rx2 and ry1 <= cy <= ry2:
                 return "yolo", i
-                
+
         return None, None
 
     def _get_handle_at(self, cx: float, cy: float, idx: int) -> Optional[str]:
@@ -305,8 +318,12 @@ class CropTool:
         x1, y1, x2, y2, _ = self._manual_annots[idx]
         rx1, ry1 = self._image_to_canvas(x1, y1)
         rx2, ry2 = self._image_to_canvas(x2, y2)
-        for name, hx, hy in (("nw", rx1, ry1), ("ne", rx2, ry1),
-                               ("sw", rx1, ry2), ("se", rx2, ry2)):
+        for name, hx, hy in (
+            ("nw", rx1, ry1),
+            ("ne", rx2, ry1),
+            ("sw", rx1, ry2),
+            ("se", rx2, ry2),
+        ):
             if abs(cx - hx) <= HANDLE_HIT and abs(cy - hy) <= HANDLE_HIT:
                 return name
         return None
@@ -336,13 +353,13 @@ class CropTool:
                     self._btn_convert.config(state=tk.NORMAL)
                 else:
                     self._btn_convert.config(state=tk.DISABLED)
-                
+
                 handle = self._get_handle_at(cx, cy, idx)
                 self._edit_drag_mode = f"resize_{handle}" if handle else "move"
                 self._edit_drag_start_canvas = (event.x, event.y)
                 x1, y1, x2, y2, _ = self._manual_annots[idx]
                 self._edit_drag_crop_orig = (x1, y1, x2, y2)
-            else: # YOLO selection
+            else:  # YOLO selection
                 self._btn_delete.config(state=tk.DISABLED)
                 self._btn_convert.config(state=tk.NORMAL)
                 self._edit_drag_mode = None
@@ -358,11 +375,13 @@ class CropTool:
         self._redraw()
 
     def _on_edit_drag(self, event: tk.Event) -> None:
-        if (self._edit_drag_mode is None
-                or self._edit_drag_start_canvas is None
-                or self._selected_idx is None
-                or self._edit_drag_crop_orig is None
-                or self.pil_image is None):
+        if (
+            self._edit_drag_mode is None
+            or self._edit_drag_start_canvas is None
+            or self._selected_idx is None
+            or self._edit_drag_crop_orig is None
+            or self.pil_image is None
+        ):
             return
         dcx = event.x - self._edit_drag_start_canvas[0]
         dcy = event.y - self._edit_drag_start_canvas[1]
@@ -379,7 +398,7 @@ class CropTool:
             nx2 = nx1 + w
             ny2 = ny1 + h
         else:
-            corner = self._edit_drag_mode[len("resize_"):]
+            corner = self._edit_drag_mode[len("resize_") :]
             nx1, ny1, nx2, ny2 = ox1, oy1, ox2, oy2
             if "w" in corner:
                 nx1 = int(max(0, min(ox2 - MIN_CROP_PX, ox1 + dix)))
@@ -393,10 +412,12 @@ class CropTool:
         self._redraw()
 
     def _on_edit_end(self, _event: tk.Event) -> None:
-        if (self._edit_drag_mode is None
-                or self._edit_drag_crop_orig is None
-                or self._selected_idx is None
-                or self.pil_image is None):
+        if (
+            self._edit_drag_mode is None
+            or self._edit_drag_crop_orig is None
+            or self._selected_idx is None
+            or self.pil_image is None
+        ):
             self._edit_drag_mode = None
             self._edit_drag_crop_orig = None
             return
@@ -435,13 +456,15 @@ class CropTool:
 
             self._manual_annots[self._selected_idx] = (nx1, ny1, nx2, ny2, new_path)
             self._sync_yolo_labels_file()
-            self._undo_stack.append({
-                "type": "edit",
-                "old_path": old_path,
-                "old_coords": (ox1, oy1, ox2, oy2),
-                "new_path": new_path,
-                "new_coords": (nx1, ny1, nx2, ny2),
-            })
+            self._undo_stack.append(
+                {
+                    "type": "edit",
+                    "old_path": old_path,
+                    "old_coords": (ox1, oy1, ox2, oy2),
+                    "new_path": new_path,
+                    "new_coords": (nx1, ny1, nx2, ny2),
+                }
+            )
             self._redraw()
             self._update_status()
         except Exception as exc:
@@ -449,7 +472,6 @@ class CropTool:
             self._manual_annots[self._selected_idx] = (ox1, oy1, ox2, oy2, old_path)
             self._redraw()
             return
-            
 
     # ── Folder / image management ─────────────────────────────────────────────
 
@@ -486,14 +508,17 @@ class CropTool:
     @property
     def labels_dir(self) -> Optional[Path]:
         """Path to labels/ folder, prefering adjacent to images/ then within it."""
-        if self.folder is None: return None
+        if self.folder is None:
+            return None
         adj = self.folder.parent / "labels"
-        if adj.exists() and adj.is_dir(): return adj
+        if adj.exists() and adj.is_dir():
+            return adj
         inner = self.folder / "labels"
         return inner
 
     def _ensure_labels_dir(self) -> Optional[Path]:
-        if self.folder is None: return None
+        if self.folder is None:
+            return None
         d = self.labels_dir
         if d is None or not d.exists():
             # If folder is called 'images', create 'labels' next to it
@@ -516,7 +541,7 @@ class CropTool:
         """Load and normalize image, using cache if available."""
         if path in self._image_cache:
             return self._image_cache[path]
-            
+
         img = Image.open(path)
         # Handle multi-frame images (TIF stacks): always use frame 0
         try:
@@ -529,7 +554,9 @@ class CropTool:
         if img.mode not in ("RGB", "RGBA", "L", "P"):
             arr = np.array(img).astype(float)
             arr_ptp = arr.ptp()
-            arr = ((arr - arr.min()) / (arr_ptp if arr_ptp else 1) * 255).astype("uint8")
+            arr = ((arr - arr.min()) / (arr_ptp if arr_ptp else 1) * 255).astype(
+                "uint8"
+            )
             img = Image.fromarray(arr)
 
         # Unify to RGB
@@ -541,24 +568,25 @@ class CropTool:
             img = bg
         elif img.mode == "L":
             img = img.convert("RGB")
-            
+
         # Manage cache size (LRU-ish)
         if len(self._image_cache) >= self._cache_size:
             # Pop the first key (oldest)
             self._image_cache.pop(next(iter(self._image_cache)))
-            
+
         self._image_cache[path] = img
         return img
 
     def _preload_neighbors(self) -> None:
         """Load next/prev images in a background thread."""
+
         def _target():
             indices = []
             if self.current_index + 1 < len(self.image_paths):
                 indices.append(self.current_index + 1)
             if self.current_index - 1 >= 0:
                 indices.append(self.current_index - 1)
-                
+
             for idx in indices:
                 path = self.image_paths[idx]
                 if path not in self._image_cache:
@@ -566,7 +594,7 @@ class CropTool:
                         self._get_image(path)
                     except Exception:
                         pass
-                        
+
         threading.Thread(target=_target, daemon=True).start()
 
     def load_image(self, index: int) -> None:
@@ -596,12 +624,18 @@ class CropTool:
         # Reset pan when navigating (intentionally preserve zoom level so
         self.pan_x = 0.0
         self.pan_y = 0.0
-        
+
         # Deduplicate YOLO labels from manual annotations to avoid overlapping boxes
         # if they both point to the same labels/ directory.
         if self._manual_annots and self._yolo_labels:
-            manual_boxes = set((x1, y1, x2, y2) for (x1, y1, x2, y2, _) in self._manual_annots)
-            self._yolo_labels = [y for y in self._yolo_labels if (y[0], y[1], y[2], y[3]) not in manual_boxes]
+            manual_boxes = set(
+                (x1, y1, x2, y2) for (x1, y1, x2, y2, _) in self._manual_annots
+            )
+            self._yolo_labels = [
+                y
+                for y in self._yolo_labels
+                if (y[0], y[1], y[2], y[3]) not in manual_boxes
+            ]
 
         self._fit_to_canvas()
 
@@ -687,47 +721,77 @@ class CropTool:
             selected = self._edit_mode and i == self._selected_idx
             color = "#FFD700" if selected else "#00FF88"
             self.canvas.create_rectangle(
-                cx1, cy1, cx2, cy2,
-                outline=color, width=2, tags="overlay",
+                cx1,
+                cy1,
+                cx2,
+                cy2,
+                outline=color,
+                width=2,
+                tags="overlay",
             )
             if selected:
                 for hx, hy in ((cx1, cy1), (cx2, cy1), (cx1, cy2), (cx2, cy2)):
                     r = HANDLE_RADIUS
                     self.canvas.create_rectangle(
-                        hx - r, hy - r, hx + r, hy + r,
-                        fill="#FFD700", outline="#FF8C00", width=1, tags="overlay",
+                        hx - r,
+                        hy - r,
+                        hx + r,
+                        hy + r,
+                        fill="#FFD700",
+                        outline="#FF8C00",
+                        width=1,
+                        tags="overlay",
                     )
-        
+
         # Draw YOLO labels (fixed detections)
         for i, (x1, y1, x2, y2, cls_id) in enumerate(self._yolo_labels):
             cx1, cy1 = self._image_to_canvas(x1, y1)
             cx2, cy2 = self._image_to_canvas(x2, y2)
-            
-            selected = self._edit_mode and self._selected_type == "yolo" and i == self._selected_idx
-            tag_color = "#00FFFF" if selected else "#FF00FF" # Cyan if selected, else Magenta
-            
+
+            selected = (
+                self._edit_mode
+                and self._selected_type == "yolo"
+                and i == self._selected_idx
+            )
+            tag_color = (
+                "#00FFFF" if selected else "#FF00FF"
+            )  # Cyan if selected, else Magenta
+
             if self._yolo_view_mode == "box":
                 self.canvas.create_rectangle(
-                    cx1, cy1, cx2, cy2,
-                   fill="", outline=tag_color, width=2 if selected else 1, 
-                   dash=None if selected else (2, 2), tags="overlay"
-            )
-            else: # point mode
+                    cx1,
+                    cy1,
+                    cx2,
+                    cy2,
+                    fill="",
+                    outline=tag_color,
+                    width=2 if selected else 1,
+                    dash=None if selected else (2, 2),
+                    tags="overlay",
+                )
+            else:  # point mode
                 mx, my = (cx1 + cx2) / 2, (cy1 + cy2) / 2
                 r = 4 if selected else 3
                 self.canvas.create_oval(
-                    mx - r, my - r, mx + r, my + r,
-                    fill=tag_color, outline="white", width=1, tags="overlay"
+                    mx - r,
+                    my - r,
+                    mx + r,
+                    my + r,
+                    fill=tag_color,
+                    outline="white",
+                    width=1,
+                    tags="overlay",
                 )
-                
+
             # Label the class if we want
             self.canvas.create_text(
-                cx1 if self._yolo_view_mode == "box" else (cx1 + cx2) / 2, 
-                (cy1 - 2) if self._yolo_view_mode == "box" else (cy1 + cy2) / 2 - 5, 
-                text=f"cls:{cls_id}", 
-                fill=tag_color, anchor=tk.SW if self._yolo_view_mode == "box" else tk.S, 
+                cx1 if self._yolo_view_mode == "box" else (cx1 + cx2) / 2,
+                (cy1 - 2) if self._yolo_view_mode == "box" else (cy1 + cy2) / 2 - 5,
+                text=f"cls:{cls_id}",
+                fill=tag_color,
+                anchor=tk.SW if self._yolo_view_mode == "box" else tk.S,
                 font=("Helvetica", 8, "bold"),
-                tags="overlay"
+                tags="overlay",
             )
 
     # ── Zoom & pan ────────────────────────────────────────────────────────────
@@ -780,14 +844,14 @@ class CropTool:
             return
         dx = event.x - self._pan_start_canvas[0]
         dy = event.y - self._pan_start_canvas[1]
-        
+
         # Real-time shift of all canvas items (don't redraw yet)
         shift_x = dx - (self.pan_x - self._pan_start_offset[0])
         shift_y = dy - (self.pan_y - self._pan_start_offset[1])
-        
+
         self.pan_x = self._pan_start_offset[0] + dx
         self.pan_y = self._pan_start_offset[1] + dy
-        
+
         self.canvas.move("all", shift_x, shift_y)
 
     def _on_pan_end(self, _event: tk.Event) -> None:
@@ -804,8 +868,14 @@ class CropTool:
             return
         self._drag_start = (event.x, event.y)
         self._rect_id = self.canvas.create_rectangle(
-            event.x, event.y, event.x, event.y,
-            outline="red", width=2, dash=(6, 4), tags="rubberband",
+            event.x,
+            event.y,
+            event.x,
+            event.y,
+            outline="red",
+            width=2,
+            dash=(6, 4),
+            tags="rubberband",
         )
 
     def _on_drag_motion(self, event: tk.Event) -> None:
@@ -844,7 +914,7 @@ class CropTool:
 
         if self.pil_image is None or self.crops_dir is None:
             return
-            
+
         new_path = None
         if self._save_crops_mode:
             stem = self._current_stem()
@@ -854,7 +924,7 @@ class CropTool:
             while save_path.exists():
                 save_path = self.crops_dir / f"{base}_{count}.png"
                 count += 1
-            
+
             try:
                 crop_img = self.pil_image.crop((x1, y1, x2, y2))
                 crop_img.save(save_path)
@@ -871,7 +941,9 @@ class CropTool:
     # ── Crop persistence ──────────────────────────────────────────────────────
 
     def _current_stem(self) -> str:
-        return self.image_paths[self.current_index].stem if self.current_index >= 0 else ""
+        return (
+            self.image_paths[self.current_index].stem if self.current_index >= 0 else ""
+        )
 
     def _load_manual_annotations(self) -> None:
         """Load annotations from YOLO labels file and link to existing PNG crops."""
@@ -893,15 +965,16 @@ class CropTool:
             with open(lbl_path, "r") as f:
                 for line in f:
                     parts = line.strip().split()
-                    if len(parts) < 5: continue
+                    if len(parts) < 5:
+                        continue
                     cls_id = int(parts[0])
                     xc, yc, w, h = map(float, parts[1:5])
-                    
+
                     px_w, px_h = w * iw, h * ih
                     px_xc, px_yc = xc * iw, yc * ih
-                    x1, y1 = int(px_xc - px_w/2), int(px_yc - px_h/2)
-                    x2, y2 = int(px_xc + px_w/2), int(px_yc + px_h/2)
-                    
+                    x1, y1 = int(px_xc - px_w / 2), int(px_yc - px_h / 2)
+                    x2, y2 = int(px_xc + px_w / 2), int(px_yc + px_h / 2)
+
                     # Try to find a matching PNG crop
                     match_path = None
                     if self.crops_dir and self.crops_dir.exists():
@@ -909,7 +982,7 @@ class CropTool:
                         matches = list(self.crops_dir.glob(base_glob))
                         if matches:
                             match_path = matches[0]
-                    
+
                     self._manual_annots.append((x1, y1, x2, y2, match_path))
         except Exception as e:
             print(f"Error loading manual annotations: {e}")
@@ -923,29 +996,26 @@ class CropTool:
         self._yolo_labels = []
         if self.folder is None or self.pil_image is None:
             return
-            
+
         # 1. Try ../labels/ (if current is .../images/)
         # 2. Try ./labels/
-        candidates = [
-            self.folder.parent / "labels",
-            self.folder / "labels"
-        ]
-        
+        candidates = [self.folder.parent / "labels", self.folder / "labels"]
+
         lbl_dir = None
         for cand in candidates:
             if cand.exists() and cand.is_dir():
                 lbl_dir = cand
                 break
-        
+
         if lbl_dir is None:
             return
-            
+
         stem = self._current_stem()
         lbl_path = lbl_dir / f"{stem}.txt"
-        
+
         if not lbl_path.exists():
             return
-            
+
         iw, ih = self.pil_image.size
         try:
             with open(lbl_path, "r") as f:
@@ -955,18 +1025,18 @@ class CropTool:
                         continue
                     cls_id = int(parts[0])
                     xc, yc, w, h = map(float, parts[1:5])
-                    
+
                     # Convert normalized to pixel coordinates
                     px_w = w * iw
                     px_h = h * ih
                     px_xc = xc * iw
                     px_yc = yc * ih
-                    
+
                     x1 = int(px_xc - px_w / 2)
                     y1 = int(px_yc - px_h / 2)
                     x2 = int(px_xc + px_w / 2)
                     y2 = int(px_yc + px_h / 2)
-                    
+
                     self._yolo_labels.append((x1, y1, x2, y2, cls_id))
         except Exception as e:
             print(f"Error loading YOLO labels from {lbl_path}: {e}")
@@ -1006,25 +1076,25 @@ class CropTool:
         lbl_dir = self._ensure_labels_dir()
         if not lbl_dir or not self.pil_image:
             return
-            
+
         stem = self._current_stem()
         lbl_path = lbl_dir / f"{stem}.txt"
-        
+
         if not self._manual_annots:
             if lbl_path.exists():
                 lbl_path.unlink()
             return
-            
+
         iw, ih = self.pil_image.size
         try:
             with open(lbl_path, "w") as f:
-                for (x1, y1, x2, y2, _) in self._manual_annots:
+                for x1, y1, x2, y2, _ in self._manual_annots:
                     # YOLO format: class x_center y_center width height (normalized)
                     w = x2 - x1
                     h = y2 - y1
                     xc = x1 + w / 2
                     yc = y1 + h / 2
-                    
+
                     n_xc = xc / iw
                     n_yc = yc / ih
                     n_w = w / iw
@@ -1037,14 +1107,19 @@ class CropTool:
         """Convert a YOLO label to a manual annotation + PNG crop. Returns True if successful."""
         if self.pil_image is None or self.crops_dir is None:
             return False
-            
+
         x1, y1, x2, y2, cls_id = self._yolo_labels[y_idx]
-        
+
         # Avoid duplicate manual labels at the same coordinates
         for mx1, my1, mx2, my2, _ in self._manual_annots:
-            if abs(mx1 - x1) < 2 and abs(my1 - y1) < 2 and abs(mx2 - x2) < 2 and abs(my2 - y2) < 2:
+            if (
+                abs(mx1 - x1) < 2
+                and abs(my1 - y1) < 2
+                and abs(mx2 - x2) < 2
+                and abs(my2 - y2) < 2
+            ):
                 return False
-                
+
         stem = self._current_stem()
         base = f"crop_{stem}_y{y1:04d}_x{x1:04d}"
         save_path = self.crops_dir / f"{base}.png"
@@ -1052,7 +1127,7 @@ class CropTool:
         while save_path.exists():
             save_path = self.crops_dir / f"{base}_{count}.png"
             count += 1
-            
+
         try:
             crop_img = self.pil_image.crop((x1, y1, x2, y2))
             crop_img.save(save_path)
@@ -1064,7 +1139,9 @@ class CropTool:
 
     def convert_selected(self) -> None:
         if self._selected_idx is None:
-            self._status.set("Select a YOLO label (magenta) or a manual label (green) first.")
+            self._status.set(
+                "Select a YOLO label (magenta) or a manual label (green) first."
+            )
             return
 
         success = False
@@ -1076,8 +1153,8 @@ class CropTool:
             if path is not None:
                 self._status.set("Crop PNG already exists.")
                 return
-            
-            if self.crops_dir is None or self.pil_image is None: 
+
+            if self.crops_dir is None or self.pil_image is None:
                 return
 
             stem = self._current_stem()
@@ -1087,7 +1164,7 @@ class CropTool:
             while save_path.exists():
                 save_path = self.crops_dir / f"{base}_{count}.png"
                 count += 1
-            
+
             try:
                 crop_img = self.pil_image.crop((x1, y1, x2, y2))
                 crop_img.save(save_path)
@@ -1103,7 +1180,7 @@ class CropTool:
             if self._selected_type == "yolo":
                 self._selected_type = "manual"
                 self._selected_idx = len(self._manual_annots) - 1
-            
+
             self._btn_convert.config(state=tk.DISABLED)
             self._btn_delete.config(state=tk.NORMAL)
             self._redraw()
@@ -1116,12 +1193,12 @@ class CropTool:
         if not self._yolo_labels:
             self._status.set("No YOLO labels to convert.")
             return
-            
+
         count = 0
         for i in range(len(self._yolo_labels)):
             if self.convert_yolo_to_manual(i):
                 count += 1
-                
+
         if count > 0:
             self._sync_yolo_labels_file()
             self._redraw()
@@ -1134,11 +1211,13 @@ class CropTool:
         if self._selected_idx is None or self._selected_type != "manual":
             return
         x1, y1, x2, y2, path = self._manual_annots[self._selected_idx]
-        self._undo_stack.append({
-            "type": "delete",
-            "path": path,
-            "coords": (x1, y1, x2, y2),
-        })
+        self._undo_stack.append(
+            {
+                "type": "delete",
+                "path": path,
+                "coords": (x1, y1, x2, y2),
+            }
+        )
         if path:
             try:
                 path.unlink(missing_ok=True)
@@ -1166,7 +1245,7 @@ class CropTool:
         y_count = len(self._yolo_labels)
         mode = "EDIT" if self._edit_mode else "CROP"
         crops_gen = "Crops:ON" if self._save_crops_mode else "Crops:OFF"
-        
+
         self._status.set(
             f"{name} ({iw}x{ih}) | Zoom:{zoom_pct}% | {mode} | {crops_gen} | {m_count} labels | {y_count} ref"
         )

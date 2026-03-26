@@ -8,10 +8,11 @@ import argparse
 import os
 import glob
 import logging
+from typing import NamedTuple
 
 import numpy as np
 import torch
-import cv2
+import cv2  # pylint: disable=no-member
 import tifffile
 from tqdm import tqdm
 
@@ -21,14 +22,22 @@ from label_images import (
     _load_model,
     _SaveConfig,
     _write_frame,
-    _print_radius_stats,
 )
 
 # Suppress pint logging
 logging.getLogger("pint").setLevel(logging.ERROR)
 
 
+class _FrameCtx(NamedTuple):
+    """Bundles inference state passed through the frame-processing pipeline."""
+
+    model: object
+    args: object
+    device: str
+
+
 def parse_args():
+    """Parse command-line arguments for the LodeSTAR autolabeler."""
     parser = argparse.ArgumentParser(
         description="LodeSTAR Autolabeler for TIFF files."
     )
@@ -66,13 +75,13 @@ def parse_args():
     )
     parser.add_argument(
         "--plot", action="store_true",
-        help="Overlay detections on the input image and save as <name>_overlay.png.",
+        help="Overlay detections on the input image and save as <n>_overlay.png.",
     )
     parser.add_argument(
         "--output-dir", type=str, default=None,
         help=(
             "Directory to write YOLO label files (and overlays). "
-            "Defaults to <name>_dataset/labels/ next to the input. "
+            "Defaults to <n>_dataset/labels/ next to the input. "
             "For TIFF mode with multiple files, each TIFF gets a sub-folder."
         ),
     )
@@ -89,16 +98,22 @@ def parse_args():
     )
     parser.add_argument(
         "--min-box-size", type=float, default=0.0,
-        help="Minimum box size in pixels when --use-radius is active. 0 = use --box-size as the floor.",
+        help=(
+            "Minimum box size in pixels when --use-radius is active. "
+            "0 = use --box-size as the floor."
+        ),
     )
     parser.add_argument(
         "--png-frames", type=str, default=None,
-        help="Directory containing PNG frames to label (alternative to --input for TIFFs).",
+        help=(
+            "Directory containing PNG frames to label "
+            "(alternative to --input for TIFFs)."
+        ),
     )
     return parser.parse_args()
 
 
-def _detect_frame(frame_norm, model, args, device):
+def _detect_frame(frame_norm, ctx):
     """Normalise a uint8 frame to float, build a tensor, run detect, return detections array.
 
     Returns None if the frame or tensor contains NaN/Inf.
@@ -112,19 +127,21 @@ def _detect_frame(frame_norm, model, args, device):
 
     # inference needs (1, 1, H, W)
     if len(frame_in.shape) == 2:
-        input_tensor = torch.from_numpy(frame_in).unsqueeze(0).unsqueeze(0).to(device)
+        input_tensor = torch.from_numpy(frame_in).unsqueeze(0).unsqueeze(0).to(ctx.device)
     else:
-        input_tensor = torch.from_numpy(frame_in[:, :, 0]).unsqueeze(0).unsqueeze(0).to(device)
+        input_tensor = (
+            torch.from_numpy(frame_in[:, :, 0]).unsqueeze(0).unsqueeze(0).to(ctx.device)
+        )
 
     if torch.isnan(input_tensor).any() or torch.isinf(input_tensor).any():
         return None
 
     with torch.inference_mode():
-        detections = model.detect(
+        detections = ctx.model.detect(
             input_tensor,
-            alpha=args.alpha,
-            beta=1.0 - args.alpha,
-            cutoff=args.cutoff,
+            alpha=ctx.args.alpha,
+            beta=1.0 - ctx.args.alpha,
+            cutoff=ctx.args.cutoff,
             mode="ratio",
         )
 
@@ -133,123 +150,142 @@ def _detect_frame(frame_norm, model, args, device):
     if np.isnan(frame_dets).any() or np.isinf(frame_dets).any():
         return None
 
-    if args.nms_distance > 0:
-        frame_dets = _nms(list(frame_dets), args.nms_distance)
+    if ctx.args.nms_distance > 0:
+        frame_dets = _nms(list(frame_dets), ctx.args.nms_distance)
 
     return frame_dets
 
 
-def _make_cfg(args, output_dir, frame_shape):
+def _make_cfg(ctx, output_dir, frame_shape):
     """Build a _SaveConfig from autolabeler args."""
-    min_box_px = args.min_box_size if args.min_box_size > 0 else float(args.box_size)
+    min_box_px = (
+        ctx.args.min_box_size if ctx.args.min_box_size > 0 else float(ctx.args.box_size)
+    )
     return _SaveConfig(
         output_dir=output_dir,
         frame_shape=frame_shape,
-        use_radius=args.use_radius,
-        radius_scale=args.radius_scale,
+        use_radius=ctx.args.use_radius,
+        radius_scale=ctx.args.radius_scale,
         min_box_px=min_box_px,
-        box_size=args.box_size,
-        do_plot=args.plot,
+        box_size=ctx.args.box_size,
+        do_plot=ctx.args.plot,
     )
+
+
+def _normalize_frame(frame_raw):
+    """Normalize a raw frame to uint8, returning the normalized array."""
+    if frame_raw.dtype != np.uint8:
+        return cv2.normalize(  # pylint: disable=no-member
+            frame_raw, None, 0, 255, cv2.NORM_MINMAX  # pylint: disable=no-member
+        ).astype("uint8")
+    return frame_raw
+
+
+def _save_image(img_path, frame_norm):
+    """Write a normalized frame to disk in BGR format."""
+    if len(frame_norm.shape) == 2:
+        cv2.imwrite(img_path, frame_norm)  # pylint: disable=no-member
+    else:
+        bgr = cv2.cvtColor(frame_norm, cv2.COLOR_RGB2BGR)  # pylint: disable=no-member
+        cv2.imwrite(img_path, bgr)  # pylint: disable=no-member
+
+
+def _process_single_png(idx, png_path, img_dir, lbl_dir, ctx):
+    """Detect objects in one PNG frame and write the YOLO label file.
+
+    Skips the frame if the label already exists, the file is unreadable,
+    or the detection output contains NaN/Inf values.
+    """
+    img_out_path = os.path.join(img_dir, f"frame_{idx:05d}.png")
+    lbl_path = os.path.join(lbl_dir, f"frame_{idx:05d}.txt")
+    if os.path.exists(lbl_path):
+        return
+
+    frame_raw = cv2.imread(png_path, cv2.IMREAD_UNCHANGED)  # pylint: disable=no-member
+    if frame_raw is None:
+        print(f"Warning: Could not read {png_path}, skipping.")
+        return
+
+    frame_norm = _normalize_frame(frame_raw)
+    _save_image(img_out_path, frame_norm)
+
+    frame_dets = _detect_frame(frame_norm, ctx)
+    if frame_dets is None:
+        print(f"Warning: skipping {png_path} (NaN/Inf or empty).")
+        return
+
+    cfg = _make_cfg(ctx, lbl_dir, frame_norm.shape[:2])
+    _write_frame(lbl_path, frame_norm, frame_dets, cfg)
+
+
+def _process_single_tif_frame(i, tiff_stack, img_dir, lbl_dir, ctx):
+    """Normalize, save, and label one frame from a TIFF stack.
+
+    Skips the frame if the label already exists or detection yields NaN/Inf.
+    """
+    lbl_path = os.path.join(lbl_dir, f"frame_{i:05d}.txt")
+    if os.path.exists(lbl_path):
+        return
+    frame_norm = _normalize_frame(tiff_stack[i])
+    _save_image(os.path.join(img_dir, f"frame_{i:05d}.png"), frame_norm)
+    frame_dets = _detect_frame(frame_norm, ctx)
+    if frame_dets is None:
+        print(f"Warning: skipping frame {i} (NaN/Inf or empty).")
+        return
+    cfg = _make_cfg(ctx, lbl_dir, frame_norm.shape[:2])
+    _write_frame(lbl_path, frame_norm, frame_dets, cfg)
 
 
 def extract_and_labels(tif_path, model, args):
     """Process a single TIFF file: extract frames and generate YOLO labels."""
     base_name = os.path.splitext(os.path.basename(tif_path))[0]
-    output_base = os.path.join(os.path.dirname(tif_path), f"{base_name}_dataset")
-    img_dir = os.path.join(output_base, "images")
+    tif_dir = os.path.dirname(tif_path)
+    # Inline dataset root to avoid an extra local variable
+    img_dir = os.path.join(tif_dir, f"{base_name}_dataset", "images")
     # --output-dir: each TIFF gets its own sub-folder to avoid name collisions
     if args.output_dir:
         lbl_dir = os.path.join(args.output_dir, base_name)
     else:
-        lbl_dir = os.path.join(output_base, "labels")
+        lbl_dir = os.path.join(tif_dir, f"{base_name}_dataset", "labels")
     os.makedirs(img_dir, exist_ok=True)
     os.makedirs(lbl_dir, exist_ok=True)
 
     try:
         tiff_stack = tifffile.imread(tif_path)
-    except Exception as e:
+    except OSError as e:
         print(f"Error reading {tif_path}: {e}")
         return
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = model.to(device)
+    ctx = _FrameCtx(model=model.to(device), args=args, device=device)
 
-    frame_indices = range(0, len(tiff_stack), args.nth)
-    print(f"Processing {tif_path}: {len(frame_indices)} frames...")
-
-    for i in tqdm(frame_indices, desc=f"Frames from {base_name}"):
-        lbl_path = os.path.join(lbl_dir, f"frame_{i:05d}.txt")
-        if os.path.exists(lbl_path):
-            continue
-
-        frame_raw = tiff_stack[i]
-
-        # Normalize for saving and inference
-        if frame_raw.dtype != np.uint8:
-            frame_norm = cv2.normalize(frame_raw, None, 0, 255, cv2.NORM_MINMAX).astype("uint8")
-        else:
-            frame_norm = frame_raw
-
-        # Save image (RoboFlow style: frame_00000.png)
-        img_path = os.path.join(img_dir, f"frame_{i:05d}.png")
-        if len(frame_norm.shape) == 2:
-            cv2.imwrite(img_path, frame_norm)
-        else:
-            cv2.imwrite(img_path, cv2.cvtColor(frame_norm, cv2.COLOR_RGB2BGR))
-
-        frame_dets = _detect_frame(frame_norm, model, args, device)
-        if frame_dets is None:
-            print(f"Warning: skipping frame {i} of {tif_path} (NaN/Inf or empty).")
-            continue
-
-        cfg = _make_cfg(args, lbl_dir, frame_norm.shape[:2])
-        _write_frame(lbl_path, frame_norm, frame_dets, cfg)
+    # Inline range into the loop to avoid an extra local variable
+    print(f"Processing {tif_path}: {len(range(0, len(tiff_stack), args.nth))} frames...")
+    for i in tqdm(range(0, len(tiff_stack), args.nth), desc=f"Frames from {base_name}"):
+        _process_single_tif_frame(i, tiff_stack, img_dir, lbl_dir, ctx)
 
 
 def process_png_frames(png_files, model, args, png_dir):
     """Process a list of PNG files: run detection and generate YOLO labels."""
     base_name = os.path.basename(os.path.normpath(png_dir))
-    output_base = os.path.join(os.path.dirname(png_dir), f"{base_name}_dataset")
-    img_dir = os.path.join(output_base, "images")
-    lbl_dir = args.output_dir if args.output_dir else os.path.join(output_base, "labels")
+    # Inline dataset root to avoid an extra local variable
+    img_dir = os.path.join(os.path.dirname(png_dir), f"{base_name}_dataset", "images")
+    lbl_dir = args.output_dir if args.output_dir else os.path.join(
+        os.path.dirname(png_dir), f"{base_name}_dataset", "labels"
+    )
     os.makedirs(img_dir, exist_ok=True)
     os.makedirs(lbl_dir, exist_ok=True)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = model.to(device)
+    ctx = _FrameCtx(model=model.to(device), args=args, device=device)
 
+    # Per-frame logic is delegated to _process_single_png to keep locals under limit
     for idx, png_path in enumerate(tqdm(png_files, desc=f"Frames from {base_name}")):
-        img_out_path = os.path.join(img_dir, f"frame_{idx:05d}.png")
-        lbl_path = os.path.join(lbl_dir, f"frame_{idx:05d}.txt")
-        if os.path.exists(lbl_path):
-            continue
-
-        frame_raw = cv2.imread(png_path, cv2.IMREAD_UNCHANGED)
-        if frame_raw is None:
-            print(f"Warning: Could not read {png_path}, skipping.")
-            continue
-        if frame_raw.dtype != np.uint8:
-            frame_norm = cv2.normalize(frame_raw, None, 0, 255, cv2.NORM_MINMAX).astype("uint8")
-        else:
-            frame_norm = frame_raw
-
-        # Save normalized image to output dir
-        if len(frame_norm.shape) == 2:
-            cv2.imwrite(img_out_path, frame_norm)
-        else:
-            cv2.imwrite(img_out_path, cv2.cvtColor(frame_norm, cv2.COLOR_RGB2BGR))
-
-        frame_dets = _detect_frame(frame_norm, model, args, device)
-        if frame_dets is None:
-            print(f"Warning: skipping {png_path} (NaN/Inf or empty).")
-            continue
-
-        cfg = _make_cfg(args, lbl_dir, frame_norm.shape[:2])
-        _write_frame(lbl_path, frame_norm, frame_dets, cfg)
+        _process_single_png(idx, png_path, img_dir, lbl_dir, ctx)
 
 
 def main():
+    """Entry point: load model and dispatch to TIFF or PNG processing."""
     args = parse_args()
 
     if not args.input and not args.png_frames:

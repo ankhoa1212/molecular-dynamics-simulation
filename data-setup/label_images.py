@@ -1,4 +1,5 @@
 """Label images using a saved LodeSTAR model, producing YOLO .txt files."""
+
 import argparse
 import dataclasses
 import glob
@@ -6,79 +7,97 @@ import json
 import logging
 import os
 
+import deeplay as dl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from PIL import Image
 from tqdm import tqdm
 
-import deeplay as dl
-
 logging.getLogger("pint").setLevel(logging.ERROR)
 
 
 def parse_args():
+    """Parse command-line arguments for the LodeSTAR YOLO labeling script."""
     parser = argparse.ArgumentParser(
         description="Run LodeSTAR inference and write YOLO label files."
     )
     parser.add_argument(
-        "--input-dir", type=str,
+        "--input-dir",
+        type=str,
         help="Directory containing input images.",
     )
     parser.add_argument(
-        "--input-file", type=str,
+        "--input-file",
+        type=str,
         help="Path to a single input image.",
     )
     parser.add_argument(
-        "--model-path", type=str, required=True,
+        "--model-path",
+        type=str,
+        required=True,
         help="Path to the saved LodeSTAR .pt weights file.",
     )
     parser.add_argument(
-        "--output-dir", type=str, default=None,
+        "--output-dir",
+        type=str,
+        default=None,
         help=(
             "Directory to save YOLO label txt files. "
             "Defaults to output_<input_folder_name> next to the input."
         ),
     )
     parser.add_argument(
-        "--box-size", type=int, default=40,
+        "--box-size",
+        type=int,
+        default=40,
         help="Fixed bounding box size in pixels. Used when --use-radius is not set.",
     )
     parser.add_argument(
-        "--use-radius", action="store_true",
+        "--use-radius",
+        action="store_true",
         help=(
             "Use LodeSTAR's per-detection radius estimate as box size "
             "instead of --box-size. Requires num_outputs >= 3 in the saved model."
         ),
     )
     parser.add_argument(
-        "--radius-scale", type=float, default=1.0,
+        "--radius-scale",
+        type=float,
+        default=1.0,
         help="Multiplier applied to the raw radius output to convert it to pixels.",
     )
     parser.add_argument(
-        "--min-box-size", type=float, default=0.0,
+        "--min-box-size",
+        type=float,
+        default=0.0,
         help=(
             "Minimum box size in pixels when --use-radius is active. "
             "0 = use --box-size as the floor."
         ),
     )
     parser.add_argument(
-        "--nms-distance", type=float, default=0.0,
-        help=(
-            "Minimum pixel distance between detections (NMS). "
-            "0 disables NMS."
-        ),
+        "--nms-distance",
+        type=float,
+        default=0.0,
+        help=("Minimum pixel distance between detections (NMS). " "0 disables NMS."),
     )
     parser.add_argument(
-        "--alpha", type=float, default=0.5,
+        "--alpha",
+        type=float,
+        default=0.5,
         help="Alpha parameter for LodeSTAR detect.",
     )
     parser.add_argument(
-        "--cutoff", type=float, default=0.5,
+        "--cutoff",
+        type=float,
+        default=0.5,
         help="Cutoff parameter for LodeSTAR detect.",
     )
     parser.add_argument(
-        "--detect-mode", type=str, default="ratio",
+        "--detect-mode",
+        type=str,
+        default="ratio",
         choices=["quantile", "ratio", "constant"],
         help=(
             "Thresholding mode for LodeSTAR detect. "
@@ -88,11 +107,14 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--detect-batch-size", type=int, default=4,
+        "--detect-batch-size",
+        type=int,
+        default=4,
         help="Batch size for detection. Keep low (e.g. 1-4) to prevent OOM.",
     )
     parser.add_argument(
-        "--plot", action="store_true",
+        "--plot",
+        action="store_true",
         help="Overlay bounding boxes on the input image and save as PNG.",
     )
     return parser.parse_args()
@@ -159,10 +181,12 @@ def _collect_detections(batch_detections, out_list):
             if isinstance(frame_dets, torch.Tensor):
                 out_list.append(frame_dets.detach().cpu().numpy())
             elif isinstance(frame_dets, (list, tuple)):
-                out_list.append([
-                    d.detach().cpu().numpy() if isinstance(d, torch.Tensor) else d
-                    for d in frame_dets
-                ])
+                out_list.append(
+                    [
+                        d.detach().cpu().numpy() if isinstance(d, torch.Tensor) else d
+                        for d in frame_dets
+                    ]
+                )
             else:
                 out_list.append(frame_dets)
     else:
@@ -188,9 +212,7 @@ def _nms(detections, min_dist):
         for idx_j in range(idx_i + 1, len(arr)):
             if suppressed[idx_j]:
                 continue
-            dist = np.sqrt(
-                (arr[idx_j, 0] - yi) ** 2 + (arr[idx_j, 1] - xi) ** 2
-            )
+            dist = np.sqrt((arr[idx_j, 0] - yi) ** 2 + (arr[idx_j, 1] - xi) ** 2)
             if dist < min_dist:
                 suppressed[idx_j] = True
     return keep
@@ -216,7 +238,7 @@ def _run_inference(lodestar, data_tensor, args, beta):
             range(0, len(data_tensor), args.detect_batch_size),
             desc="Detecting targets",
         ):
-            batch = data_tensor[i: i + args.detect_batch_size]
+            batch = data_tensor[i : i + args.detect_batch_size]
             try:
                 batch_dets = _run_detect(batch, detect_device)
                 if detect_device == "cuda":
@@ -230,7 +252,7 @@ def _run_inference(lodestar, data_tensor, args, beta):
                     torch.cuda.empty_cache()
                 batch_dets = []
                 for j in range(len(batch)):
-                    single = batch[j: j + 1]
+                    single = batch[j : j + 1]
                     try:
                         det = _run_detect(single, detect_device)
                         if detect_device == "cuda":
@@ -249,11 +271,13 @@ def _run_inference(lodestar, data_tensor, args, beta):
 
 
 def _print_radius_stats(all_detections, radius_scale):
+    """Print stats about radius channel in detections: min, max, mean, & scaled box pixel range."""
     all_radii = [
         float(det[2])
         for frame_dets in all_detections
         for det in (
-            [frame_dets] if isinstance(frame_dets, np.ndarray) and frame_dets.ndim == 1
+            [frame_dets]
+            if isinstance(frame_dets, np.ndarray) and frame_dets.ndim == 1
             else frame_dets
         )
         if hasattr(det, "__len__") and len(det) >= 3
@@ -283,20 +307,24 @@ class _SaveConfig:
 
     @property
     def frame_h(self):
+        """Return the frame height from the frame shape tuple."""
         return self.frame_shape[0]
 
     @property
     def frame_w(self):
+        """Return the frame width from the frame shape tuple."""
         return self.frame_shape[1]
 
 
 def _det_box_px(det, cfg):
+    """Calculate bounding box size in pixels using radius, otherwise fixed box size."""
     if cfg.use_radius and len(det) >= 3:
         return max(cfg.min_box_px, abs(float(det[2])) * cfg.radius_scale)
     return float(cfg.box_size)
 
 
 def _yolo_coords(det_y, det_x, box_px, frame_h, frame_w):
+    """Convert detection and box size to YOLO normalized coordinates."""
     x_c = max(0.0, min(1.0, det_x / frame_w))
     y_c = max(0.0, min(1.0, det_y / frame_h))
     n_w = max(0.0, min(1.0, box_px / frame_w))
@@ -317,7 +345,7 @@ def _write_frame(frame_file, image, frame_dets, cfg):
     base_name = os.path.splitext(os.path.basename(frame_file))[0]
     txt_path = os.path.join(cfg.output_dir, f"{base_name}.txt")
 
-    fig, ax = (plt.subplots(1) if cfg.do_plot else (None, None))
+    fig, ax = plt.subplots(1) if cfg.do_plot else (None, None)
     if cfg.do_plot:
         ax.imshow(image, cmap="gray")
 
@@ -335,7 +363,11 @@ def _write_frame(frame_file, image, frame_dets, cfg):
 def _save_labels_and_plots(image_files, images, all_detections, cfg):
     print("Saving YOLO labels...")
     for frame_idx, (frame_file, frame_dets) in enumerate(
-        tqdm(zip(image_files, all_detections), total=len(image_files), desc="Processing files")
+        tqdm(
+            zip(image_files, all_detections),
+            total=len(image_files),
+            desc="Processing files",
+        )
     ):
         _write_frame(frame_file, images[frame_idx], frame_dets, cfg)
 
@@ -352,6 +384,7 @@ def _print_detection_summary(all_detections):
 
 
 def main():
+    """Main entry point for running LodeSTAR YOLO labeling from the command line."""
     args = parse_args()
 
     if not args.input_dir and not args.input_file:

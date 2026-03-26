@@ -114,16 +114,52 @@ Writes one `.txt` YOLO label file per input image.
 ### `lodestar_autolabeler.py`
 
 Batch-labels raw TIFF stacks or a folder of PNG frames using a saved model.
-Output is written in a RoboFlow-compatible structure: `<name>_dataset/{images,labels}/`.
+By default, output is written in a RoboFlow-compatible structure: `<name>_dataset/{images,labels}/` next to the input. Use `--output-dir` to redirect labels to a specific directory.
+
+Either `--input` (TIFF search) or `--png-frames` must be provided.
 
 | Argument | Default | Description |
 |---|---|---|
 | `--model` | **required** | Path to saved `.pt` weights |
 | `--input` | — | Root directory to search for `.tif`/`.tiff` files recursively |
 | `--png-frames` | — | Directory of PNG frames to label (alternative to `--input`) |
-| `--nth` | `10` | Save every nth frame from TIFF stacks |
+| `--output-dir` | `<name>_dataset/labels/` | Directory to write YOLO label files and overlays. For TIFF mode, each TIFF gets a sub-folder. |
+| `--nth` | `5` | Save every nth frame from TIFF stacks |
+| `--alpha` | `0.5` | Blend between equivariance score (0) and detection score (1) |
+| `--cutoff` | `0.5` | Detection threshold (`ratio` mode: keep scores ≥ `cutoff × max`) |
+| `--nms-distance` | `0` | Min pixel distance between detections; 0 disables NMS |
 | `--box-size` | `40` | Fixed bounding box size in pixels |
+| `--use-radius` | off | Use per-detection radius from the model instead of `--box-size` |
+| `--radius-scale` | `1.0` | Multiplier on raw radius output to convert to pixels |
+| `--min-box-size` | `0` | Minimum box size in pixels when `--use-radius` is active |
 | `--detect-batch-size` | `4` | Frames per GPU batch |
+| `--plot` | off | Save `*_overlay.png` with detections drawn |
+
+**Label TIFF stacks:**
+
+```bash
+python lodestar_autolabeler.py \
+  --model models/exp1.pt \
+  --input data/raw_tiffs/ \
+  --nth 5 \
+  --cutoff 0.4 \
+  --nms-distance 15 \
+  --output-dir /mnt/results/labels \
+  --plot
+```
+
+**Label a folder of PNG frames (with radius-based boxes):**
+
+```bash
+python lodestar_autolabeler.py \
+  --model models/exp1.pt \
+  --png-frames data/frames/ \
+  --output-dir /mnt/results/labels \
+  --use-radius --radius-scale 2.0 \
+  --alpha 0.9 --cutoff 0.001 \
+  --nms-distance 35 \
+  --plot
+```
 
 ---
 

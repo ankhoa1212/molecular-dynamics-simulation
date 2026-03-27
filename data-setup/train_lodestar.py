@@ -1,4 +1,5 @@
 """Train a LodeSTAR model and save weights + companion JSON config."""
+
 import argparse
 import json
 import logging
@@ -48,9 +49,7 @@ class _DualEarlyStopping(Callback):
                     all_plateaued = False
 
         if all_plateaued:
-            print(
-                f"\nEarly stopping: both losses plateaued for {self._patience} epochs."
-            )
+            print(f"\nEarly stopping: both losses plateaued for {self._patience} epochs.")
             trainer.should_stop = True
 
     def state_dict(self):
@@ -70,74 +69,108 @@ def parse_args():
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "--input-dir", type=str, nargs="+",
+        "--input-dir",
+        type=str,
+        nargs="+",
         help="One or more directories containing input images.",
     )
     group.add_argument(
-        "--input-file", type=str, nargs="+",
+        "--input-file",
+        type=str,
+        nargs="+",
         help="One or more paths to individual input images.",
     )
     parser.add_argument(
-        "--model-path", type=str, default=None,
+        "--model-path",
+        type=str,
+        default=None,
         help=(
             "Where to save the trained model (.pt). "
             "Defaults to lodestar_model.pt next to the input folder."
         ),
     )
     parser.add_argument(
-        "--num-outputs", type=int, default=3,
+        "--num-outputs",
+        type=int,
+        default=3,
         help="Number of LodeSTAR output channels. 2=(x,y); 3=(x,y,radius).",
     )
     parser.add_argument(
-        "--n-transforms", type=int, default=8,
+        "--n-transforms",
+        type=int,
+        default=8,
         help="Number of geometric transforms for LodeSTAR equivariance.",
     )
     parser.add_argument(
-        "--epochs", type=int, default=100,
+        "--epochs",
+        type=int,
+        default=100,
         help="Number of max epochs for training LodeSTAR.",
     )
     parser.add_argument(
-        "--crop-size", type=int, default=64,
-        help=("Target square size for crops: centre-pad if smaller, "
-              "centre-crop if larger (default: 64)."),
+        "--crop-size",
+        type=int,
+        default=64,
+        help=(
+            "Target square size for crops: centre-pad if smaller, "
+            "centre-crop if larger (default: 64)."
+        ),
     )
     parser.add_argument(
-        "--batch-size", type=int, default=8,
+        "--batch-size",
+        type=int,
+        default=8,
         help="Batch size for DataLoader.",
     )
     parser.add_argument(
-        "--num-workers", type=int, default=0,
+        "--num-workers",
+        type=int,
+        default=0,
         help="Number of DataLoader worker processes. 0 is safest.",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="Random seed for reproducibility.",
     )
     parser.add_argument(
-        "--experiment", type=str, default="lodestar",
+        "--experiment",
+        type=str,
+        default="lodestar",
         help="MLflow experiment name.",
     )
     parser.add_argument(
-        "--run-name", type=str, default=None,
+        "--run-name",
+        type=str,
+        default=None,
         help="MLflow run name. Defaults to the model filename stem.",
     )
     parser.add_argument(
-        "--mlflow-uri", type=str, default="mlruns",
+        "--mlflow-uri",
+        type=str,
+        default="mlruns",
         help="MLflow tracking URI (local path or remote).",
     )
     parser.add_argument(
-        "--patience", type=int, default=15,
+        "--patience",
+        type=int,
+        default=15,
         help=(
             "Early-stopping patience: stop when both within_image_disagreement "
             "and between_image_disagreement show no improvement for this many epochs."
         ),
     )
     parser.add_argument(
-        "--min-delta", type=float, default=0.005,
+        "--min-delta",
+        type=float,
+        default=0.005,
         help="Minimum decrease in a loss to count as an improvement.",
     )
     parser.add_argument(
-        "--dataset-length", type=int, default=None,
+        "--dataset-length",
+        type=int,
+        default=None,
         help=(
             "Augmented samples generated per crop per epoch. "
             "Defaults to 1024 for ≤5 crops, 512 for ≤20, 256 otherwise."
@@ -151,8 +184,8 @@ def _pad_to_square(img: Image.Image, size: int) -> Image.Image:
     w, h = img.size
     if w > size or h > size:
         left = max((w - size) // 2, 0)
-        top  = max((h - size) // 2, 0)
-        img  = img.crop((left, top, left + min(w, size), top + min(h, size)))
+        top = max((h - size) // 2, 0)
+        img = img.crop((left, top, left + min(w, size), top + min(h, size)))
         w, h = img.size
     pad_l = (size - w) // 2
     pad_t = (size - h) // 2
@@ -348,19 +381,21 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     mlflow.set_experiment(args.experiment)
 
     with mlflow.start_run(run_name=run_name):
-        mlflow.log_params({
-            "epochs": args.epochs,
-            "crop_size": args.crop_size,
-            "batch_size": args.batch_size,
-            "n_transforms": args.n_transforms,
-            "num_outputs": args.num_outputs,
-            "seed": args.seed,
-            "num_crops": len(crop_files),
-            "source_dirs": ", ".join(source_dirs),
-            "patience": args.patience,
-            "min_delta": args.min_delta,
-            "dataset_length": args.dataset_length,
-        })
+        mlflow.log_params(
+            {
+                "epochs": args.epochs,
+                "crop_size": args.crop_size,
+                "batch_size": args.batch_size,
+                "n_transforms": args.n_transforms,
+                "num_outputs": args.num_outputs,
+                "seed": args.seed,
+                "num_crops": len(crop_files),
+                "source_dirs": ", ".join(source_dirs),
+                "patience": args.patience,
+                "min_delta": args.min_delta,
+                "dataset_length": args.dataset_length,
+            }
+        )
 
         crops_data = _load_crops(crop_files, crop_size=args.crop_size)
         lodestar = _build_and_train(args, crops_data)

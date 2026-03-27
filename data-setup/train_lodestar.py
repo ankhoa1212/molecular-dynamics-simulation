@@ -30,6 +30,7 @@ class _DualEarlyStopping(Callback):
 
     def on_train_epoch_end(self, trainer, pl_module):
         """Check plateau condition at the end of each training epoch."""
+        del pl_module  # explicitly mark as unused to satisfy pylint
         all_plateaued = True
         for metric in self._metrics:
             current = trainer.callback_metrics.get(metric)
@@ -51,6 +52,15 @@ class _DualEarlyStopping(Callback):
                 f"\nEarly stopping: both losses plateaued for {self._patience} epochs."
             )
             trainer.should_stop = True
+
+    def state_dict(self):
+        """Return callback state to support lightning checkpointing."""
+        return {"best": self._best.copy(), "wait": self._wait.copy()}
+
+    def load_state_dict(self, state_dict):
+        """Restore callback state from a lightning checkpoint."""
+        self._best.update(state_dict.get("best", {}))
+        self._wait.update(state_dict.get("wait", {}))
 
 
 def parse_args():

@@ -10,11 +10,10 @@ import numpy as np
 import torch
 from PIL import Image, ImageOps
 from pytorch_lightning.loggers import MLFlowLogger
-from tqdm import tqdm
+from pytorch_lightning.callbacks import Callback
 
 import deeplay as dl
 import deeptrack as dt
-from pytorch_lightning.callbacks import Callback
 
 logging.getLogger("pint").setLevel(logging.ERROR)
 
@@ -30,6 +29,7 @@ class _DualEarlyStopping(Callback):
         self._wait = {m: 0 for m in metrics}
 
     def on_train_epoch_end(self, trainer, pl_module):
+        """Check plateau condition at the end of each training epoch."""
         all_plateaued = True
         for metric in self._metrics:
             current = trainer.callback_metrics.get(metric)
@@ -54,6 +54,7 @@ class _DualEarlyStopping(Callback):
 
 
 def parse_args():
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Train a LodeSTAR model and save it for later inference."
     )
@@ -87,7 +88,8 @@ def parse_args():
     )
     parser.add_argument(
         "--crop-size", type=int, default=64,
-        help="Target square size for crops: centre-pad if smaller, centre-crop if larger (default: 64).",
+        help=("Target square size for crops: centre-pad if smaller, "
+              "centre-crop if larger (default: 64)."),
     )
     parser.add_argument(
         "--batch-size", type=int, default=8,
@@ -249,7 +251,8 @@ def _build_and_train(args, crops_data):
     return lodestar
 
 
-def main():
+def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    """Main execution block for LodeSTAR training."""
     args = parse_args()
 
     if args.model_path is None:
@@ -267,7 +270,7 @@ def main():
     # Aggregate crop files from all sources
     crop_files_set = set()
     valid_exts = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
-    
+
     source_dirs = []
     if args.input_dir:
         source_dirs = args.input_dir
@@ -285,7 +288,8 @@ def main():
             found_base = [
                 os.path.join(base_dir, fn)
                 for fn in os.listdir(base_dir)
-                if os.path.isfile(os.path.join(base_dir, fn)) and os.path.splitext(fn)[1].lower() in valid_exts
+                if os.path.isfile(os.path.join(base_dir, fn))
+                and os.path.splitext(fn)[1].lower() in valid_exts
             ]
             if found_base:
                 print(f"Found {len(found_base)} image(s) in {base_dir}")
@@ -298,7 +302,8 @@ def main():
                 found_crops = [
                     os.path.join(crops_dir, fn)
                     for fn in os.listdir(crops_dir)
-                    if os.path.isfile(os.path.join(crops_dir, fn)) and os.path.splitext(fn)[1].lower() in valid_exts
+                    if os.path.isfile(os.path.join(crops_dir, fn))
+                    and os.path.splitext(fn)[1].lower() in valid_exts
                 ]
                 if found_crops:
                     print(f"Found {len(found_crops)} image(s) in {crops_dir}")
@@ -310,9 +315,12 @@ def main():
     crop_files = sorted(list(crop_files_set))
 
     if not crop_files:
-        print("No crops found across all sources. Use crop_tool.py to manually create crops before training.")
+        print(
+            "No crops found across all sources. "
+            "Use crop_tool.py to manually create crops before training."
+        )
         return
-    
+
     # Sort for reproducibility
     crop_files.sort()
     print(f"Total: Found {len(crop_files)} crop image(s) for training.")

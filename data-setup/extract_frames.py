@@ -77,7 +77,7 @@ def convert_tif_to_frames(input_path, output_folder, image_format="png", nth=10)
     # 3. Iterate through frames and save every nth frame
     saved_count = 0
     frame_indices = range(0, len(tiff_stack), nth)
-    for i in tqdm(frame_indices, desc=f"Saving frames", unit="frame"):
+    for i in tqdm(frame_indices, desc="Saving frames", unit="frame"):
         frame = tiff_stack[i]
 
         # 4. Normalization

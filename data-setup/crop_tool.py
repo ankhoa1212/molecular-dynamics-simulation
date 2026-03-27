@@ -21,6 +21,7 @@ Edit Mode:
     Click empty area  Deselect
 """
 
+# pylint: disable=too-many-lines
 from __future__ import annotations
 
 import re
@@ -46,7 +47,8 @@ HANDLE_RADIUS = 6  # display half-size of corner handle squares (canvas px)
 HANDLE_HIT = 12  # hit-detection half-size for corner handles (canvas px)
 
 
-class CropTool:
+class CropTool:  # pylint: disable=too-many-instance-attributes
+    """Main application window and logic for the crop tool."""
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("Manual Crop Tool")
@@ -253,6 +255,7 @@ class CropTool:
     # ── Edit mode ────────────────────────────────────────────────────────────
 
     def toggle_edit_mode(self) -> None:
+        """Toggle between crop drawing and edit modes."""
         self._edit_mode = not self._edit_mode
         if not self._edit_mode:
             self._selected_idx = None
@@ -272,6 +275,7 @@ class CropTool:
         self._update_status()
 
     def toggle_yolo_view_mode(self) -> None:
+        """Toggle the display format of YOLO labels (box or point)."""
         self._yolo_view_mode = "point" if self._yolo_view_mode == "box" else "box"
         self._btn_yolo_mode.config(
             text=f"YOLO: {self._yolo_view_mode.capitalize()} (Y)"
@@ -283,6 +287,7 @@ class CropTool:
         self._update_status()
 
     def toggle_save_crops_mode(self) -> None:
+        """Toggle whether PNG crops are saved to disk."""
         self._save_crops_mode = not self._save_crops_mode
         state = "On" if self._save_crops_mode else "Off"
         self._btn_save_crops.config(
@@ -374,7 +379,7 @@ class CropTool:
             self._btn_convert.config(state=tk.DISABLED)
         self._redraw()
 
-    def _on_edit_drag(self, event: tk.Event) -> None:
+    def _on_edit_drag(self, event: tk.Event) -> None:  # pylint: disable=too-many-locals
         if (
             self._edit_drag_mode is None
             or self._edit_drag_start_canvas is None
@@ -411,7 +416,7 @@ class CropTool:
         self._manual_annots[self._selected_idx] = (nx1, ny1, nx2, ny2, path)
         self._redraw()
 
-    def _on_edit_end(self, _event: tk.Event) -> None:
+    def _on_edit_end(self, _event: tk.Event) -> None:  # pylint: disable=too-many-locals
         if (
             self._edit_drag_mode is None
             or self._edit_drag_crop_orig is None
@@ -446,7 +451,7 @@ class CropTool:
                         crop_img.save(new_path)
                         if old_path != new_path and old_path:
                             old_path.unlink(missing_ok=True)
-                    except Exception as exc:
+                    except Exception as exc:  # pylint: disable=broad-exception-caught
                         self._status.set(f"Crop save failed: {exc}")
                         # keep going to save the label at least
             else:
@@ -467,7 +472,7 @@ class CropTool:
             )
             self._redraw()
             self._update_status()
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             self._status.set(f"Save failed: {exc}")
             self._manual_annots[self._selected_idx] = (ox1, oy1, ox2, oy2, old_path)
             self._redraw()
@@ -476,6 +481,7 @@ class CropTool:
     # ── Folder / image management ─────────────────────────────────────────────
 
     def open_folder(self) -> None:
+        """Prompt the user to select an image folder."""
         path = filedialog.askdirectory(
             title="Select image folder",
             initialdir=str(self.folder or Path.home()),
@@ -496,6 +502,7 @@ class CropTool:
 
     @property
     def crops_dir(self) -> Optional[Path]:
+        """Return the path to the crops subdirectory if a folder is loaded."""
         return (self.folder / CROPS_SUBDIR) if self.folder else None
 
     def _ensure_crops_dir(self) -> Optional[Path]:
@@ -530,10 +537,12 @@ class CropTool:
         return d
 
     def prev_image(self) -> None:
+        """Navigate to the previous image in the directory."""
         if self.current_index > 0:
             self.load_image(self.current_index - 1)
 
     def next_image(self) -> None:
+        """Navigate to the next image in the directory."""
         if self.current_index < len(self.image_paths) - 1:
             self.load_image(self.current_index + 1)
 
@@ -592,18 +601,19 @@ class CropTool:
                 if path not in self._image_cache:
                     try:
                         self._get_image(path)
-                    except Exception:
+                    except Exception:  # pylint: disable=broad-exception-caught
                         pass
 
         threading.Thread(target=_target, daemon=True).start()
 
     def load_image(self, index: int) -> None:
+        """Load the image at the given index and update UI state."""
         self.current_index = index
         path = self.image_paths[index]
 
         try:
             self.pil_image = self._get_image(path)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             self._status.set(f"Error loading {path.name}: {e}")
             return
 
@@ -700,7 +710,7 @@ class CropTool:
         iw, ih = self.pil_image.size
         new_w = max(1, int(iw * ds))
         new_h = max(1, int(ih * ds))
-        resample = Image.NEAREST if ds > 2 else Image.BILINEAR
+        resample = Image.Resampling.NEAREST if ds > 2 else Image.Resampling.BILINEAR
         resized = self.pil_image.resize((new_w, new_h), resample)
         self._tk_img = ImageTk.PhotoImage(resized)
         self.canvas.delete("all")
@@ -713,7 +723,7 @@ class CropTool:
         )
         self._draw_crop_overlays()
 
-    def _draw_crop_overlays(self) -> None:
+    def _draw_crop_overlays(self) -> None:  # pylint: disable=too-many-locals
         """Draw a rectangle on the canvas for each manual annotation."""
         for i, (x1, y1, x2, y2, _) in enumerate(self._manual_annots):
             cx1, cy1 = self._image_to_canvas(x1, y1)
@@ -797,10 +807,12 @@ class CropTool:
     # ── Zoom & pan ────────────────────────────────────────────────────────────
 
     def zoom_in(self) -> None:
+        """Zoom into the image."""
         cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
         self._zoom_at(cw / 2, ch / 2, ZOOM_STEP)
 
     def zoom_out(self) -> None:
+        """Zoom out of the image."""
         cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
         self._zoom_at(cw / 2, ch / 2, 1 / ZOOM_STEP)
 
@@ -820,6 +832,7 @@ class CropTool:
         self._update_status()
 
     def reset_transform(self) -> None:
+        """Reset zoom and pan to fit the image to the canvas."""
         self.zoom_level = 1.0
         self.pan_x = 0.0
         self.pan_y = 0.0
@@ -887,7 +900,7 @@ class CropTool:
         x0, y0 = self._drag_start
         self.canvas.coords(self._rect_id, x0, y0, event.x, event.y)
 
-    def _on_drag_end(self, event: tk.Event) -> None:
+    def _on_drag_end(self, event: tk.Event) -> None:  # pylint: disable=too-many-locals
         if self._edit_mode:
             self._on_edit_end(event)
             return
@@ -929,7 +942,7 @@ class CropTool:
                 crop_img = self.pil_image.crop((x1, y1, x2, y2))
                 crop_img.save(save_path)
                 new_path = save_path
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 self._status.set(f"Crop save failed: {e}")
 
         self._manual_annots.append((x1, y1, x2, y2, new_path))
@@ -945,7 +958,7 @@ class CropTool:
             self.image_paths[self.current_index].stem if self.current_index >= 0 else ""
         )
 
-    def _load_manual_annotations(self) -> None:
+    def _load_manual_annotations(self) -> None:  # pylint: disable=too-many-locals
         """Load annotations from YOLO labels file and link to existing PNG crops."""
         self._manual_annots = []
         if self.folder is None or self.pil_image is None:
@@ -962,12 +975,12 @@ class CropTool:
 
         iw, ih = self.pil_image.size
         try:
-            with open(lbl_path, "r") as f:
+            with open(lbl_path, "r", encoding="utf-8") as f:
                 for line in f:
                     parts = line.strip().split()
                     if len(parts) < 5:
                         continue
-                    cls_id = int(parts[0])
+                    _cls_id = int(parts[0])
                     xc, yc, w, h = map(float, parts[1:5])
 
                     px_w, px_h = w * iw, h * ih
@@ -984,14 +997,13 @@ class CropTool:
                             match_path = matches[0]
 
                     self._manual_annots.append((x1, y1, x2, y2, match_path))
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Error loading manual annotations: {e}")
 
     def _load_existing_crops(self) -> None:
         """DEPRECATED: Replaced by _load_manual_annotations which syncs from labels."""
-        pass
 
-    def _load_yolo_labels(self) -> None:
+    def _load_yolo_labels(self) -> None:  # pylint: disable=too-many-locals
         """Scan for YOLO .txt labels in adjacent folders."""
         self._yolo_labels = []
         if self.folder is None or self.pil_image is None:
@@ -1018,7 +1030,7 @@ class CropTool:
 
         iw, ih = self.pil_image.size
         try:
-            with open(lbl_path, "r") as f:
+            with open(lbl_path, "r", encoding="utf-8") as f:
                 for line in f:
                     parts = line.strip().split()
                     if len(parts) < 5:
@@ -1038,10 +1050,11 @@ class CropTool:
                     y2 = int(px_yc + px_h / 2)
 
                     self._yolo_labels.append((x1, y1, x2, y2, cls_id))
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Error loading YOLO labels from {lbl_path}: {e}")
 
     def undo_last_crop(self) -> None:
+        """Revert the last create, edit, or delete action."""
         if not self._undo_stack:
             self._status.set("Nothing to undo.")
             return
@@ -1071,7 +1084,7 @@ class CropTool:
         self._redraw()
         self._update_status()
 
-    def _sync_yolo_labels_file(self) -> None:
+    def _sync_yolo_labels_file(self) -> None:  # pylint: disable=too-many-locals
         """Write all current image's manual crops to the YOLO labels file."""
         lbl_dir = self._ensure_labels_dir()
         if not lbl_dir or not self.pil_image:
@@ -1087,7 +1100,7 @@ class CropTool:
 
         iw, ih = self.pil_image.size
         try:
-            with open(lbl_path, "w") as f:
+            with open(lbl_path, "w", encoding="utf-8") as f:
                 for x1, y1, x2, y2, _ in self._manual_annots:
                     # YOLO format: class x_center y_center width height (normalized)
                     w = x2 - x1
@@ -1100,15 +1113,15 @@ class CropTool:
                     n_w = w / iw
                     n_h = h / ih
                     f.write(f"0 {n_xc:.6f} {n_yc:.6f} {n_w:.6f} {n_h:.6f}\n")
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             self._status.set(f"YOLO sync failed: {e}")
 
-    def convert_yolo_to_manual(self, y_idx: int) -> bool:
+    def convert_yolo_to_manual(self, y_idx: int) -> bool:  # pylint: disable=too-many-locals
         """Convert a YOLO label to a manual annotation + PNG crop. Returns True if successful."""
         if self.pil_image is None or self.crops_dir is None:
             return False
 
-        x1, y1, x2, y2, cls_id = self._yolo_labels[y_idx]
+        x1, y1, x2, y2, _ = self._yolo_labels[y_idx]
 
         # Avoid duplicate manual labels at the same coordinates
         for mx1, my1, mx2, my2, _ in self._manual_annots:
@@ -1133,11 +1146,12 @@ class CropTool:
             crop_img.save(save_path)
             self._manual_annots.append((x1, y1, x2, y2, save_path))
             return True
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Failed to convert YOLO to crop: {e}")
             return False
 
     def convert_selected(self) -> None:
+        """Convert the currently selected YOLO label to a manual label."""
         if self._selected_idx is None:
             self._status.set(
                 "Select a YOLO label (magenta) or a manual label (green) first."
@@ -1170,7 +1184,7 @@ class CropTool:
                 crop_img.save(save_path)
                 self._manual_annots[self._selected_idx] = (x1, y1, x2, y2, save_path)
                 success = True
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 self._status.set(f"Manual conversion failed: {e}")
                 return
 
@@ -1190,6 +1204,7 @@ class CropTool:
             self._status.set("Conversion failed or crop already exists.")
 
     def convert_all_yolo(self) -> None:
+        """Convert all YOLO labels in the current image to manual labels."""
         if not self._yolo_labels:
             self._status.set("No YOLO labels to convert.")
             return
@@ -1208,6 +1223,7 @@ class CropTool:
             self._status.set("No new YOLO labels were converted.")
 
     def delete_selected_crop(self) -> None:
+        """Delete the currently selected manual crop."""
         if self._selected_idx is None or self._selected_type != "manual":
             return
         x1, y1, x2, y2, path = self._manual_annots[self._selected_idx]
@@ -1221,7 +1237,7 @@ class CropTool:
         if path:
             try:
                 path.unlink(missing_ok=True)
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=broad-exception-caught
                 self._status.set(f"Delete failed: {exc}")
                 self._undo_stack.pop()
                 return
@@ -1247,7 +1263,8 @@ class CropTool:
         crops_gen = "Crops:ON" if self._save_crops_mode else "Crops:OFF"
 
         self._status.set(
-            f"{name} ({iw}x{ih}) | Zoom:{zoom_pct}% | {mode} | {crops_gen} | {m_count} labels | {y_count} ref"
+            f"{name} ({iw}x{ih}) | Zoom:{zoom_pct}% | {mode} | "
+            f"{crops_gen} | {m_count} labels | {y_count} ref"
         )
 
     # ── Canvas resize ─────────────────────────────────────────────────────────
@@ -1281,6 +1298,7 @@ class CropTool:
     # ── Entry point ───────────────────────────────────────────────────────────
 
     def run(self) -> None:
+        """Start the application main loop."""
         # If a folder path is given as a CLI argument, open it automatically
         if len(sys.argv) > 1:
             folder = Path(sys.argv[1])

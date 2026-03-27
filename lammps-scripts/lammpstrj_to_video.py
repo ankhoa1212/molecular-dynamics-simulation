@@ -67,7 +67,7 @@ def convert_trajectory_to_video(
         print(f"Successfully created: {output_file}")
         return True
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error converting {input_file}: {str(e)}")
         return False
 
@@ -117,11 +117,13 @@ def process_folder(folder_path, output_dir=None, width=1920, height=1080, fps=30
             success_count += 1
 
     print(
-        f"\nConversion complete: {success_count}/{len(trajectory_files)} files successfully converted"
+        f"\nConversion complete: {success_count}/{len(trajectory_files)} "
+        "files successfully converted"
     )
 
 
 def main():
+    """Main entry point for command-line execution."""
     parser = argparse.ArgumentParser(
         description="Convert LAMMPS trajectory files (.lammpstrj) to AVI videos using OVITO",
         formatter_class=argparse.RawDescriptionHelpFormatter,

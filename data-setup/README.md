@@ -13,6 +13,10 @@ Detects particles in microscopy images and outputs YOLO-format `.txt` label file
 | `label_images.py` | Run inference with a saved model to produce YOLO labels |
 | `lodestar_autolabeler.py` | Batch label raw TIFF stacks or PNG frames with a saved model |
 
+For help on script usage:
+```bash
+python name_of_script.py --help
+```
 ---
 
 ## Installation
@@ -25,12 +29,12 @@ pip install -r requirements.txt
 
 ## Recommended Workflow: Crop → Train → Label
 
-### 1. Create Crops
+### 1. Create Crops for Autolabeler
 
 Use `crop_tool.py` to open a frame and manually draw bounding boxes around representative particles.
 Crops are saved to a `crops/` subdirectory inside the frame folder.
 
-### 2. Train
+### 2. Train Autolabeler
 
 ```bash
 python train_lodestar.py \
@@ -56,7 +60,7 @@ If that name exists, a suffix is appended automatically (`lodestar_model_1.pt`, 
 
 Training uses early stopping and is logged to MLflow automatically (see [MLflow](#mlflow) below).
 
-### 3. Label
+### 3. Label Images (to test out autolabeller model before using it for mass-autolabelling)
 
 ```bash
 python label_images.py \
@@ -66,6 +70,22 @@ python label_images.py \
 ```
 
 Writes one `.txt` YOLO label file per input image.
+
+
+### 4. Run Autolabeler
+
+To batch-label a folder of PNG frames using a trained model, run:
+
+```bash
+python lodestar_autolabeler.py \
+  --model models/lodestar_model_10.pt \
+  --input "/folder/path/of/tif/file" \
+  --use-radius \
+  --alpha 0.9 --cutoff 0.001 \
+  --nms-distance 35
+```
+
+This will label all PNG frames in the specified directory using the provided model, with radius-based bounding boxes and the given detection parameters.
 
 ---
 

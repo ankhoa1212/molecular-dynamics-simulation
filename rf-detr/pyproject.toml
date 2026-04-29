@@ -1,5 +1,5 @@
 [project]
-name = "particle-tracking"
+name = "rf-detr"
 version = "0.1.0"
 description = "RF-DETR particle detection training pipeline"
 requires-python = ">=3.11"

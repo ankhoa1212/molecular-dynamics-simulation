@@ -18,4 +18,4 @@ training:
   checkpoint_dir: checkpoints
 
 mlflow:
-  experiment_name: particle-tracking
+  experiment_name: rf-detr

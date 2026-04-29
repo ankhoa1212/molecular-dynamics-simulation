@@ -1,4 +1,4 @@
-# Particle Tracking — RF-DETR Pipeline
+# RF-DETR Particle Detection Pipeline
 
 Training and evaluation pipeline for detecting particles in microscopy images using [RF-DETR](https://github.com/roboflow/rf-detr). Experiment results are tracked with MLflow.
 
@@ -11,7 +11,7 @@ Training and evaluation pipeline for detecting particles in microscopy images us
 ## Setup
 
 ```bash
-cd particle-tracking
+cd rf-detr
 uv sync
 ```
 
@@ -77,7 +77,7 @@ training:
   checkpoint_dir: checkpoints     # where model weights are saved
 
 mlflow:
-  experiment_name: particle-tracking
+  experiment_name: rf-detr
 ```
 
 ---

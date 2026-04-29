@@ -7,9 +7,9 @@ data/
 **/__pycache__/
 __pycache__/
 
-# particle-tracking
-particle-tracking/mlruns/
-particle-tracking/checkpoints/
-particle-tracking/*.pth
-particle-tracking/split/
-particle-tracking/.venv/
+# rf-detr
+rf-detr/mlruns/
+rf-detr/checkpoints/
+rf-detr/*.pth
+rf-detr/split/
+rf-detr/.venv/

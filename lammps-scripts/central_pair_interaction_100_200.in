@@ -14,7 +14,7 @@ create_box 1 box                     # Create the simulation box with 1 atom typ
 create_atoms 1 random 100 12345 NULL overlap 3.9 maxtry 50
 
 # --- Define the variables for lj/expand ---
-variable	epsilon equal 200.0	# energy (strength of attraction between particles)
+variable	epsilon equal 1.0	# energy (strength of attraction between particles)
 variable	sigma equal 1.0		# distance where particles bond (potential energy is 0)
 variable	delta equal 0.0		# radius difference between particles (for lj/expand)
 variable	cutoff equal 2.0	# cutoff distance (particles greater than this have the interaction ignored)

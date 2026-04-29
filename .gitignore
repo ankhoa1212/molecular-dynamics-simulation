@@ -2,11 +2,14 @@ log.lammps
 
 venv/
 output/
-tests/
+*.csv
 data/
-runs/
-results/
-
 **/__pycache__/
 __pycache__/
 
+# particle-tracking
+particle-tracking/mlruns/
+particle-tracking/checkpoints/
+particle-tracking/*.pth
+particle-tracking/split/
+particle-tracking/.venv/

@@ -1,0 +1,21 @@
+dataset:
+  path: /path/to/dataset          # directory containing images/ and annotations.json
+  train_experiments:
+    - trial1
+  val_experiments:
+    - trial2
+  test_experiments:
+    - trial3
+
+model:
+  variant: base                   # base | large
+
+training:
+  epochs: 50
+  batch_size: 4
+  grad_accum_steps: 4
+  learning_rate: 1.0e-4
+  checkpoint_dir: checkpoints
+
+mlflow:
+  experiment_name: particle-tracking

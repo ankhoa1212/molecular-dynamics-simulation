@@ -1,0 +1,3 @@
+[submodule "machine-learning/yolov12"]
+	path = machine-learning/yolov12
+	url = https://github.com/sunsmarterjie/yolov12

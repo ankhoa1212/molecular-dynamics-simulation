@@ -314,12 +314,8 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         x1, y1, x2, y2, _ = self._manual_annots[idx]
         rx1, ry1 = self._image_to_canvas(x1, y1)
         rx2, ry2 = self._image_to_canvas(x2, y2)
-        for name, hx, hy in (
-            ("nw", rx1, ry1),
-            ("ne", rx2, ry1),
-            ("sw", rx1, ry2),
-            ("se", rx2, ry2),
-        ):
+        handles = [("nw", rx1, ry1), ("ne", rx2, ry1), ("sw", rx1, ry2), ("se", rx2, ry2)]
+        for name, hx, hy in handles:
             if abs(cx - hx) <= HANDLE_HIT and abs(cy - hy) <= HANDLE_HIT:
                 return name
         return None
@@ -371,13 +367,14 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         self._redraw()
 
     def _on_edit_drag(self, event: tk.Event) -> None:  # pylint: disable=too-many-locals
-        if (
+        missing_state = (
             self._edit_drag_mode is None
             or self._edit_drag_start_canvas is None
             or self._selected_idx is None
             or self._edit_drag_crop_orig is None
             or self.pil_image is None
-        ):
+        )
+        if missing_state:
             return
         dcx = event.x - self._edit_drag_start_canvas[0]
         dcy = event.y - self._edit_drag_start_canvas[1]
@@ -408,12 +405,13 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         self._redraw()
 
     def _on_edit_end(self, _event: tk.Event) -> None:  # pylint: disable=too-many-locals
-        if (
+        missing_state = (
             self._edit_drag_mode is None
             or self._edit_drag_crop_orig is None
             or self._selected_idx is None
             or self.pil_image is None
-        ):
+        )
+        if missing_state:
             self._edit_drag_mode = None
             self._edit_drag_crop_orig = None
             return
@@ -442,7 +440,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                         crop_img.save(new_path)
                         if old_path != new_path and old_path:
                             old_path.unlink(missing_ok=True)
-                    except Exception as exc:  # pylint: disable=broad-exception-caught
+                    except Exception as exc:  # pylint: disable=broad-except
                         self._status.set(f"Crop save failed: {exc}")
                         # keep going to save the label at least
             else:
@@ -463,7 +461,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             )
             self._redraw()
             self._update_status()
-        except Exception as exc:  # pylint: disable=broad-exception-caught
+        except Exception as exc:  # pylint: disable=broad-except
             self._status.set(f"Save failed: {exc}")
             self._manual_annots[self._selected_idx] = (ox1, oy1, ox2, oy2, old_path)
             self._redraw()
@@ -504,7 +502,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                         p = folder / name
                         if p.is_file():
                             paths.append(p)
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception as e:  # pylint: disable=broad-except
                 self.root.after(0, lambda: _finish_scan(None, e))
                 return
             self.root.after(0, lambda: _finish_scan(sorted(paths), None))
@@ -632,7 +630,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                 if path not in self._image_cache:
                     try:
                         self._get_image(path)
-                    except Exception:  # pylint: disable=broad-exception-caught
+                    except Exception:  # pylint: disable=broad-except
                         pass
 
         threading.Thread(target=_target, daemon=True).start()
@@ -645,7 +643,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         try:
             self.pil_image = self._get_image(path)
             self.cv_image = np.array(self.pil_image)
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-except
             self._status.set(f"Error loading {path.name}: {e}")
             return
 
@@ -989,7 +987,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                 crop_img = self.pil_image.crop((x1, y1, x2, y2))
                 crop_img.save(save_path)
                 new_path = save_path
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception as e:  # pylint: disable=broad-except
                 self._status.set(f"Crop save failed: {e}")
 
         self._manual_annots.append((x1, y1, x2, y2, new_path))
@@ -1042,7 +1040,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                             match_path = matches[0]
 
                     self._manual_annots.append((x1, y1, x2, y2, match_path))
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-except
             print(f"Error loading manual annotations: {e}")
 
     def _load_existing_crops(self) -> None:
@@ -1095,7 +1093,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                     y2 = int(px_yc + px_h / 2)
 
                     self._yolo_labels.append((x1, y1, x2, y2, cls_id))
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-except
             print(f"Error loading YOLO labels from {lbl_path}: {e}")
 
     def undo_last_crop(self) -> None:
@@ -1158,7 +1156,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                     n_w = w / iw
                     n_h = h / ih
                     f.write(f"0 {n_xc:.6f} {n_yc:.6f} {n_w:.6f} {n_h:.6f}\n")
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-except
             self._status.set(f"YOLO sync failed: {e}")
 
     def convert_yolo_to_manual(self, y_idx: int) -> bool:  # pylint: disable=too-many-locals
@@ -1186,7 +1184,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             crop_img.save(save_path)
             self._manual_annots.append((x1, y1, x2, y2, save_path))
             return True
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-except
             print(f"Failed to convert YOLO to crop: {e}")
             return False
 
@@ -1222,7 +1220,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                 crop_img.save(save_path)
                 self._manual_annots[self._selected_idx] = (x1, y1, x2, y2, save_path)
                 success = True
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception as e:  # pylint: disable=broad-except
                 self._status.set(f"Manual conversion failed: {e}")
                 return
 
@@ -1269,7 +1267,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         if path:
             try:
                 path.unlink(missing_ok=True)
-            except Exception as exc:  # pylint: disable=broad-exception-caught
+            except Exception as exc:  # pylint: disable=broad-except
                 self._status.set(f"Delete failed: {exc}")
                 self._undo_stack.pop()
                 return

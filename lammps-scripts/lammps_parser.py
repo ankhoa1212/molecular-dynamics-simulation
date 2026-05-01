@@ -6,7 +6,7 @@ Shared utilities for parsing LAMMPS dump files.
 def parse_lammps_dump(filename):
     """
     Generator that yields simulation frames from a LAMMPS dump file.
-    
+
     Yields:
         dict: containing:
             - timestep (int)

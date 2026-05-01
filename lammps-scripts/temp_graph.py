@@ -221,24 +221,24 @@ def plot_temperatures(filename, output_dir=None, no_show=False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
+    PARSER = argparse.ArgumentParser(
         description="Plot drift-corrected temperature from LAMMPS trajectory"
     )
-    ex = (
+    EX = (
         "/home/austin/git/molecular-dynamics-simulation/"
         "lammps-scripts/test_same/test.in_100_5.0.lammpstrj"
     )
 
     # ex = '.../test_same/logs/test.in_100_5.0.log'
-    parser.add_argument("--filename", "-f", default=ex, help="Path to file")
-    parser.add_argument("--output_dir", default=None, help="Output directory")
-    parser.add_argument("--no-show", action="store_true", help="Do not display the graph")
-    args = parser.parse_args()
-    if args.filename.endswith(".log"):
-        plot_log_temperature(args.filename, args.output_dir, args.no_show)
-    elif args.filename.endswith(".lammpstrj"):
+    PARSER.add_argument("--filename", "-f", default=EX, help="Path to file")
+    PARSER.add_argument("--output_dir", default=None, help="Output directory")
+    PARSER.add_argument("--no-show", action="store_true", help="Do not display the graph")
+    ARGS = PARSER.parse_args()
+    if ARGS.filename.endswith(".log"):
+        plot_log_temperature(ARGS.filename, ARGS.output_dir, ARGS.no_show)
+    elif ARGS.filename.endswith(".lammpstrj"):
         print("Note: graphing the .log file will be more accurate")
-        plot_temperatures(args.filename, args.output_dir, args.no_show)
+        plot_temperatures(ARGS.filename, ARGS.output_dir, ARGS.no_show)
     else:
         print("Error: File should be either .log or .lammpstrj")
         sys.exit(1)

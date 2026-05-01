@@ -59,6 +59,6 @@ def evaluate_yolov12(weights, data, img_size=640, conf_thres=0.001, iou_thres=0.
 
 
 if __name__ == "__main__":
-    weights = "yolov12.pt"
-    data = {"val": "data/val.txt"}  # Update with your validation data path
-    evaluate_yolov12(weights, data)
+    WEIGHTS = "yolov12.pt"
+    DATA = {"val": "data/val.txt"}  # Update with your validation data path
+    evaluate_yolov12(WEIGHTS, DATA)

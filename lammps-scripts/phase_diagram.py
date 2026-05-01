@@ -142,28 +142,28 @@ def generate_stability_plot(data_dir, pattern, verbose):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
+    PARSER = argparse.ArgumentParser(
         description="Generate hexatic order phase diagram from LAMMPS trajectory files."
     )
-    parser.add_argument(
+    PARSER.add_argument(
         "data_dir",
         nargs="?",
         default="/home/austin/git/molecular-dynamics-simulation/lammps-scripts/1.0_temp",
         help="Path to folder containing .lammpstrj files (default: ./data)",
     )
-    parser.add_argument(
+    PARSER.add_argument(
         "--pattern",
         default="*.in_*_*.lammpstrj",
         help="Filename pattern inside the folder (default: %(default)s)",
     )
-    parser.add_argument("--test", help="Test a single lammpstrj file instead of generating plot")
-    parser.add_argument("--verbose", default=0, help="Set to 1 to print out results")
+    PARSER.add_argument("--test", help="Test a single lammpstrj file instead of generating plot")
+    PARSER.add_argument("--verbose", default=0, help="Set to 1 to print out results")
 
-    args = parser.parse_args()
+    ARGS = PARSER.parse_args()
 
-    if args.test:
-        test_single_file(args.test)
+    if ARGS.test:
+        test_single_file(ARGS.test)
     else:
-        if args.verbose:
-            print(args.data_dir)
-        generate_stability_plot(args.data_dir, args.pattern, verbose=args.verbose)
+        if ARGS.verbose:
+            print(ARGS.data_dir)
+        generate_stability_plot(ARGS.data_dir, ARGS.pattern, verbose=ARGS.verbose)

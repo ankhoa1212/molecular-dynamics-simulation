@@ -6,15 +6,15 @@ import logging
 import os
 import random
 
-import mlflow
 import numpy as np
 import torch
 from PIL import Image, ImageOps
-from pytorch_lightning.loggers import MLFlowLogger
 from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.loggers import MLFlowLogger
 
 import deeplay as dl
 import deeptrack as dt
+import mlflow
 
 logging.getLogger("pint").setLevel(logging.ERROR)
 

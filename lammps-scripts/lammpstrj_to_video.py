@@ -62,7 +62,7 @@ def convert_trajectory_to_video(input_file, output_file=None, width=1920, height
         print(f"Successfully created: {output_file}")
         return True
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-except
         print(f"Error converting {input_file}: {str(e)}")
         return False
 

@@ -340,9 +340,10 @@ def _write_frame(frame_file, image, frame_dets, cfg):
 
 def _save_labels_and_plots(image_files, images, all_detections, cfg):
     print("Saving YOLO labels...")
-    for frame_idx, (frame_file, frame_dets) in enumerate(
-        tqdm(zip(image_files, all_detections), total=len(image_files), desc="Processing files")
-    ):
+    detections_iter = tqdm(
+        zip(image_files, all_detections), total=len(image_files), desc="Processing files"
+    )
+    for frame_idx, (frame_file, frame_dets) in enumerate(detections_iter):
         _write_frame(frame_file, images[frame_idx], frame_dets, cfg)
 
 

@@ -83,8 +83,8 @@ jobs:
           
           # Run pylint with parallel execution
           pylint --jobs=0 --rcfile=.pylintrc \
-            --output-format=json:lint-reports/pylint.json \
-            ${{ steps.files.outputs.files }} || true
+            --output-format=json \
+            ${{ steps.files.outputs.files }} > lint-reports/pylint.json 2>/dev/null || true
           
           # Also generate human-readable report
           pylint --rcfile=.pylintrc --output-format=text \

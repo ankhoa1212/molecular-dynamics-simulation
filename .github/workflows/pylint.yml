@@ -17,7 +17,7 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-latest
-      INSTALL_LAMMPS_DEPS: "false"
+    
 
     steps:
       - name: Checkout
@@ -29,15 +29,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          key: ${{ runner.os }}-pip-3.11-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-pip-3.11-
 
       - name: Install dependencies and tools
         run: |
@@ -58,7 +57,12 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             # PR: only lint changed files
-            FILES=$(git diff --name-only origin/${{ github.base_ref }} -- '*.py' | tr '\n' ' ')
+            if git fetch origin ${{ github.base_ref }} --depth=1; then
+              FILES=$(git diff --name-only origin/${{ github.base_ref }} -- '*.py' | tr '\n' ' ')
+            else
+              echo "::warning::Could not fetch base ref; falling back to full repo lint"
+              FILES=$(git ls-files '*.py' | tr '\n' ' ')
+            fi
             echo "scope=PR (changed files only)" >> $GITHUB_OUTPUT
           else
             # Push or manual: lint all tracked files
@@ -88,12 +92,12 @@ jobs:
           mkdir -p lint-reports
           
           # Run pylint with parallel execution
-          pylint --jobs=0 \
+          pylint --jobs=0 --rcfile=.pylintrc \
             --output-format=json:lint-reports/pylint.json \
             ${{ steps.files.outputs.files }} || true
           
           # Also generate human-readable report
-          pylint --output-format=text \
+          pylint --rcfile=.pylintrc --output-format=text \
             ${{ steps.files.outputs.files }} > lint-reports/pylint.txt 2>&1 || true
 
       - name: Generate lint summary

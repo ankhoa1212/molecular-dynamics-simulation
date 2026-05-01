@@ -82,12 +82,12 @@ jobs:
           mkdir -p lint-reports
           
           # Run pylint with parallel execution
-          pylint --jobs=0 \
+          pylint --jobs=0 --rcfile=.pylintrc \
             --output-format=json:lint-reports/pylint.json \
             ${{ steps.files.outputs.files }} || true
           
           # Also generate human-readable report
-          pylint --output-format=text \
+          pylint --rcfile=.pylintrc --output-format=text \
             ${{ steps.files.outputs.files }} > lint-reports/pylint.txt 2>&1 || true
       - name: Generate lint summary
         if: always()

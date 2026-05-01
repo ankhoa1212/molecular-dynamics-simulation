@@ -151,10 +151,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         _sep(toolbar)
 
         self._btn_edit_mode = tk.Button(
-            toolbar,
-            text="Edit Mode (E)",
-            command=self.toggle_edit_mode,
-            relief=tk.RAISED,
+            toolbar, text="Edit Mode (E)", command=self.toggle_edit_mode, relief=tk.RAISED
         )
         self._btn_edit_mode.pack(side=tk.LEFT, padx=2, pady=3)
 
@@ -179,10 +176,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         _sep(toolbar)
 
         self._btn_convert = tk.Button(
-            toolbar,
-            text="Convert to Crop (T)",
-            command=self.convert_selected,
-            state=tk.DISABLED,
+            toolbar, text="Convert to Crop (T)", command=self.convert_selected, state=tk.DISABLED
         )
         self._btn_convert.pack(side=tk.LEFT, padx=2, pady=3)
 
@@ -291,8 +285,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         self._save_crops_mode = not self._save_crops_mode
         state = "On" if self._save_crops_mode else "Off"
         self._btn_save_crops.config(
-            text=f"Crops: {state} (C)",
-            relief=tk.SUNKEN if self._save_crops_mode else tk.RAISED,
+            text=f"Crops: {state} (C)", relief=tk.SUNKEN if self._save_crops_mode else tk.RAISED
         )
         self._update_status()
 
@@ -481,8 +474,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
     def open_folder(self) -> None:
         """Prompt the user to select an image folder."""
         path = filedialog.askdirectory(
-            title="Select image folder",
-            initialdir=str(self.folder or Path.home()),
+            title="Select image folder", initialdir=str(self.folder or Path.home())
         )
         if path:
             self._open_folder_path(Path(path))
@@ -726,10 +718,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
 
     def _image_to_canvas(self, ix: float, iy: float) -> tuple[float, float]:
         ds = self.display_scale
-        return (
-            ix * ds + self.img_offset_x + self.pan_x,
-            iy * ds + self.img_offset_y + self.pan_y,
-        )
+        return (ix * ds + self.img_offset_x + self.pan_x, iy * ds + self.img_offset_y + self.pan_y)
 
     def _clamp_to_image(self, ix: float, iy: float) -> tuple[int, int]:
         if self.pil_image is None:
@@ -802,15 +791,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             cx2, cy2 = self._image_to_canvas(x2, y2)
             selected = self._edit_mode and i == self._selected_idx
             color = "#FFD700" if selected else "#00FF88"
-            self.canvas.create_rectangle(
-                cx1,
-                cy1,
-                cx2,
-                cy2,
-                outline=color,
-                width=2,
-                tags="overlay",
-            )
+            self.canvas.create_rectangle(cx1, cy1, cx2, cy2, outline=color, width=2, tags="overlay")
             if selected:
                 for hx, hy in ((cx1, cy1), (cx2, cy1), (cx1, cy2), (cx2, cy2)):
                     r = HANDLE_RADIUS
@@ -1284,13 +1265,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         if self._selected_idx is None or self._selected_type != "manual":
             return
         x1, y1, x2, y2, path = self._manual_annots[self._selected_idx]
-        self._undo_stack.append(
-            {
-                "type": "delete",
-                "path": path,
-                "coords": (x1, y1, x2, y2),
-            }
-        )
+        self._undo_stack.append({"type": "delete", "path": path, "coords": (x1, y1, x2, y2)})
         if path:
             try:
                 path.unlink(missing_ok=True)

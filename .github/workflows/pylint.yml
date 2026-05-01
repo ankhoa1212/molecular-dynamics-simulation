@@ -9,12 +9,14 @@ on:
       - "**/*.py"
   workflow_dispatch:
 
+env:
+  INSTALL_DATA_SETUP_DEPS: "false"
+  INSTALL_RF_DETR_DEPS: "false"
+  INSTALL_LAMMPS_DEPS: "false"
+
 jobs:
   lint:
     runs-on: ubuntu-latest
-    env:
-      INSTALL_DATA_SETUP_DEPS: "false"
-      INSTALL_RF_DETR_DEPS: "false"
       INSTALL_LAMMPS_DEPS: "false"
 
     steps:
@@ -161,5 +163,61 @@ jobs:
         with:
           name: lint-reports
           path: lint-reports/
+          retention-days: 30
+
+  lint-lammps:
+    # Run pylint for lammps-scripts using Python 3.8 and its requirements
+    if: env.INSTALL_LAMMPS_DEPS == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+          cache: "pip"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.8-${{ hashFiles('**/lammps-scripts/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-3.8-
+
+      - name: Install lammps deps and pylint
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install pylint
+          if [ -f lammps-scripts/requirements.txt ]; then pip install --cache-dir ~/.cache/pip -r lammps-scripts/requirements.txt; fi
+
+      - name: Find lammps python files
+        id: files-lammps
+        run: |
+          FILES=$(git ls-files | grep '^lammps-scripts/.*\.py$' || true)
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+
+      - name: Run pylint for lammps-scripts
+        continue-on-error: true
+        run: |
+          if [ -z "${{ steps.files-lammps.outputs.files }}" ]; then
+            echo "::notice::No lammps Python files to lint"
+            exit 0
+          fi
+          mkdir -p lint-reports-lammps
+          pylint --jobs=0 --rcfile=.pylintrc --output-format=json:lint-reports-lammps/pylint.json ${{ steps.files-lammps.outputs.files }} || true
+          pylint --rcfile=.pylintrc --output-format=text ${{ steps.files-lammps.outputs.files }} > lint-reports-lammps/pylint.txt 2>&1 || true
+
+      - name: Upload lammps lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports-lammps
+          path: lint-reports-lammps/
           retention-days: 30
       # PR comment step removed for simplicity; reports are uploaded as artifacts instead.

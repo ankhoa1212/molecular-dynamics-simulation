@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: 'pip' # Built-in caching is more reliable than manual cache steps
+          cache: 'pip'
 
       - name: Install dependencies and tools
         run: |
@@ -43,14 +43,12 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             git fetch origin ${{ github.base_ref }} --depth=1
-            # Using grep to avoid issues with empty diffs
             FILES=$(git diff --name-only origin/${{ github.base_ref }} -- | grep '\.py$' || true)
             echo "scope=PR (changed files only)" >> $GITHUB_OUTPUT
           else
             FILES=$(git ls-files '*.py')
             echo "scope=Full repository" >> $GITHUB_OUTPUT
           fi
-          # Multiline output handling for many files
           echo "files<<EOF" >> $GITHUB_OUTPUT
           echo "$FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -58,7 +56,6 @@ jobs:
       - name: Check Black formatting
         if: steps.files.outputs.files != ''
         run: |
-          # Use xargs to handle long file lists and maintain return codes
           echo "${{ steps.files.outputs.files }}" | xargs black --check --line-length=100
 
       - name: Run pylint
@@ -109,8 +106,8 @@ jobs:
           retention-days: 30
 
   lint-lammps:
-    # CRITICAL: Access env via the env context in 'if'
-    if: github.env.INSTALL_LAMMPS_DEPS == 'true' || vars.INSTALL_LAMMPS_DEPS == 'true' || env.INSTALL_LAMMPS_DEPS == 'true'
+    # Fixed the 'env' context error here
+    if: env.INSTALL_LAMMPS_DEPS == 'true' || vars.INSTALL_LAMMPS_DEPS == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

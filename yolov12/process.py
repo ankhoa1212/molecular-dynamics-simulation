@@ -29,7 +29,7 @@ for split_name in SPLIT_DIRS:
     if not (has_images_dir and has_labels_dir and has_images and has_labels):
         PROCESSING_NEEDED = False
         break
-    if not PROCESSING_NEEDED:
+if PROCESSING_NEEDED:
     print("Data directory already in YOLO format. No processing needed.")
     exit(0)
 # Create output directories

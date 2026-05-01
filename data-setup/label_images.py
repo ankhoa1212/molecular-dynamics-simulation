@@ -22,21 +22,10 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Run LodeSTAR inference and write YOLO label files."
     )
+    parser.add_argument("--input-dir", type=str, help="Directory containing input images.")
+    parser.add_argument("--input-file", type=str, help="Path to a single input image.")
     parser.add_argument(
-        "--input-dir",
-        type=str,
-        help="Directory containing input images.",
-    )
-    parser.add_argument(
-        "--input-file",
-        type=str,
-        help="Path to a single input image.",
-    )
-    parser.add_argument(
-        "--model-path",
-        type=str,
-        required=True,
-        help="Path to the saved LodeSTAR .pt weights file.",
+        "--model-path", type=str, required=True, help="Path to the saved LodeSTAR .pt weights file."
     )
     parser.add_argument(
         "--output-dir",
@@ -83,16 +72,10 @@ def parse_args():
         help=("Minimum pixel distance between detections (NMS). " "0 disables NMS."),
     )
     parser.add_argument(
-        "--alpha",
-        type=float,
-        default=0.5,
-        help="Alpha parameter for LodeSTAR detect.",
+        "--alpha", type=float, default=0.5, help="Alpha parameter for LodeSTAR detect."
     )
     parser.add_argument(
-        "--cutoff",
-        type=float,
-        default=0.5,
-        help="Cutoff parameter for LodeSTAR detect.",
+        "--cutoff", type=float, default=0.5, help="Cutoff parameter for LodeSTAR detect."
     )
     parser.add_argument(
         "--detect-mode",
@@ -165,9 +148,7 @@ def _load_model(args):
         args.num_outputs = num_outputs
 
     lodestar = dl.LodeSTAR(
-        n_transforms=n_transforms,
-        num_outputs=num_outputs,
-        optimizer=dl.Adam(lr=1e-3),
+        n_transforms=n_transforms, num_outputs=num_outputs, optimizer=dl.Adam(lr=1e-3)
     ).build()
     lodestar.load_state_dict(torch.load(args.model_path, map_location="cpu"))
     lodestar.eval()
@@ -234,10 +215,7 @@ def _run_inference(lodestar, data_tensor, args, beta):
 
     all_detections = []
     with torch.inference_mode():
-        for i in tqdm(
-            range(0, len(data_tensor), args.detect_batch_size),
-            desc="Detecting targets",
-        ):
+        for i in tqdm(range(0, len(data_tensor), args.detect_batch_size), desc="Detecting targets"):
             batch = data_tensor[i : i + args.detect_batch_size]
             try:
                 batch_dets = _run_detect(batch, detect_device)
@@ -363,11 +341,7 @@ def _write_frame(frame_file, image, frame_dets, cfg):
 def _save_labels_and_plots(image_files, images, all_detections, cfg):
     print("Saving YOLO labels...")
     for frame_idx, (frame_file, frame_dets) in enumerate(
-        tqdm(
-            zip(image_files, all_detections),
-            total=len(image_files),
-            desc="Processing files",
-        )
+        tqdm(zip(image_files, all_detections), total=len(image_files), desc="Processing files")
     ):
         _write_frame(frame_file, images[frame_idx], frame_dets, cfg)
 

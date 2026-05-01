@@ -46,7 +46,7 @@ def _process_velocity_data(filename):
             if len(parts) > max(vx_idx, vy_idx):
                 vx = float(parts[vx_idx])
                 vy = float(parts[vy_idx])
-                raw_data.append(np.sqrt(vx**2 + vy**2))
+                raw_data.append(np.sqrt(vx ** 2 + vy ** 2))
 
         if raw_data:
             avg_velocities.append(np.mean(raw_data))
@@ -83,7 +83,7 @@ def plot_velocity_over_time(filename, output_dir, no_show=False):
     # Generate output filename
     base_name = os.path.basename(filename)
     if "." in base_name:
-        base_name = base_name[:base_name.rfind(".")]
+        base_name = base_name[: base_name.rfind(".")]
 
     output_filename = f"{base_name}_velocity_graph.png"
 
@@ -111,9 +111,7 @@ if __name__ == "__main__":
         default=os.path.join(os.getcwd(), "test_same", "test.in_100_5.0.lammpstrj"),
         help="Path to the LAMMPS trajectory file",
     )
-    parser.add_argument(
-        "--output_dir", default=None, help="output directory to save graph file to"
-    )
+    parser.add_argument("--output_dir", default=None, help="output directory to save graph file to")
     parser.add_argument("--no-show", action="store_true", help="Do not display the graph")
     args = parser.parse_args()
 

@@ -27,15 +27,10 @@ def resolve_checkpoint(config: dict, run_id: str | None) -> Path:
         if pth_artifacts:
             local_path = client.download_artifacts(run_id, pth_artifacts[0].path)
             return Path(local_path)
-    candidates = sorted(
-        checkpoint_dir.glob("*.pth"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
+    candidates = sorted(checkpoint_dir.glob("*.pth"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not candidates:
         raise FileNotFoundError(
-            f"No checkpoint found in {checkpoint_dir}. "
-            "Run training first or pass --run-id."
+            f"No checkpoint found in {checkpoint_dir}. " "Run training first or pass --run-id."
         )
     return candidates[0]
 
@@ -43,9 +38,11 @@ def resolve_checkpoint(config: dict, run_id: str | None) -> Path:
 def load_model(variant: str, checkpoint: Path):
     if variant == "base":
         from rfdetr import RFDETRBase
+
         return RFDETRBase(pretrain_weights=str(checkpoint))
     elif variant == "large":
         from rfdetr import RFDETRLarge
+
         return RFDETRLarge(pretrain_weights=str(checkpoint))
     raise ValueError(f"Unknown model variant {variant!r}. Choose 'base' or 'large'.")
 
@@ -54,9 +51,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate RF-DETR particle detector")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument(
-        "--run-id",
-        default=None,
-        help="MLflow run ID to load checkpoint from and log metrics to",
+        "--run-id", default=None, help="MLflow run ID to load checkpoint from and log metrics to"
     )
     args = parser.parse_args()
 
@@ -109,9 +104,7 @@ def main() -> None:
     map_result = map_metric.compute()
 
     confusion = ConfusionMatrix.from_detections(
-        predictions=all_predictions,
-        targets=all_targets,
-        classes=["particle"],
+        predictions=all_predictions, targets=all_targets, classes=["particle"]
     )
     # matrix shape: (num_classes+1, num_classes+1); last index = background
     # matrix[actual][predicted]

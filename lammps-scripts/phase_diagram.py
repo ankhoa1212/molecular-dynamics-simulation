@@ -37,7 +37,6 @@ def extract_epsilon_and_molecules(filename):
     return None, None
 
 
-
 def test_single_file(filename):
     """
     Test and display hexatic analysis results for a single lammpstrj file.
@@ -129,14 +128,10 @@ def generate_stability_plot(data_dir, pattern, verbose):
     )
 
     cbar = plt.colorbar(scatter)
-    cbar.set_label(
-        r"Average Hexatic Order Parameter $\langle |\psi_6| \rangle$", fontsize=12
-    )
+    cbar.set_label(r"Average Hexatic Order Parameter $\langle |\psi_6| \rangle$", fontsize=12)
 
     plt.xlabel(r"Epsilon ($\epsilon$)", fontsize=12)
-    plt.title(
-        r"Phase Behavior: $N$ vs $\epsilon$ colored by Hexatic Order", fontsize=14
-    )
+    plt.title(r"Phase Behavior: $N$ vs $\epsilon$ colored by Hexatic Order", fontsize=14)
     plt.ylabel("Number of Molecules ($N$)", fontsize=12)
     plt.xlim(0, max_epsilon)
     plt.ylim(0, max_molecules)
@@ -161,9 +156,7 @@ if __name__ == "__main__":
         default="*.in_*_*.lammpstrj",
         help="Filename pattern inside the folder (default: %(default)s)",
     )
-    parser.add_argument(
-        "--test", help="Test a single lammpstrj file instead of generating plot"
-    )
+    parser.add_argument("--test", help="Test a single lammpstrj file instead of generating plot")
     parser.add_argument("--verbose", default=0, help="Set to 1 to print out results")
 
     args = parser.parse_args()

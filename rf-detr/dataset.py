@@ -84,7 +84,5 @@ def split_by_experiment(
         result[split_name] = out_dir
 
     return DatasetSplits(
-        train_dir=result["train"],
-        valid_dir=result["valid"],
-        test_dir=result["test"],
+        train_dir=result["train"], valid_dir=result["valid"], test_dir=result["test"]
     )

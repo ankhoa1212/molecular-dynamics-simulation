@@ -69,16 +69,10 @@ def parse_args():
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "--input-dir",
-        type=str,
-        nargs="+",
-        help="One or more directories containing input images.",
+        "--input-dir", type=str, nargs="+", help="One or more directories containing input images."
     )
     group.add_argument(
-        "--input-file",
-        type=str,
-        nargs="+",
-        help="One or more paths to individual input images.",
+        "--input-file", type=str, nargs="+", help="One or more paths to individual input images."
     )
     parser.add_argument(
         "--model-path",
@@ -102,10 +96,7 @@ def parse_args():
         help="Number of geometric transforms for LodeSTAR equivariance.",
     )
     parser.add_argument(
-        "--epochs",
-        type=int,
-        default=100,
-        help="Number of max epochs for training LodeSTAR.",
+        "--epochs", type=int, default=100, help="Number of max epochs for training LodeSTAR."
     )
     parser.add_argument(
         "--crop-size",
@@ -116,29 +107,16 @@ def parse_args():
             "centre-crop if larger (default: 64)."
         ),
     )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=8,
-        help="Batch size for DataLoader.",
-    )
+    parser.add_argument("--batch-size", type=int, default=8, help="Batch size for DataLoader.")
     parser.add_argument(
         "--num-workers",
         type=int,
         default=0,
         help="Number of DataLoader worker processes. 0 is safest.",
     )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
     parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed for reproducibility.",
-    )
-    parser.add_argument(
-        "--experiment",
-        type=str,
-        default="lodestar",
-        help="MLflow experiment name.",
+        "--experiment", type=str, default="lodestar", help="MLflow experiment name."
     )
     parser.add_argument(
         "--run-name",
@@ -247,9 +225,7 @@ def _build_and_train(args, crops_data):
     print(f"Training LodeSTAR on {len(crops_data)} crops.")
 
     lodestar = dl.LodeSTAR(
-        n_transforms=args.n_transforms,
-        num_outputs=args.num_outputs,
-        optimizer=dl.Adam(lr=1e-3),
+        n_transforms=args.n_transforms, num_outputs=args.num_outputs, optimizer=dl.Adam(lr=1e-3)
     ).build()
 
     datasets = [
@@ -278,9 +254,7 @@ def _build_and_train(args, crops_data):
         stopping_metrics = ["within_image_disagreement", "between_image_disagreement"]
 
     early_stop = _DualEarlyStopping(
-        metrics=stopping_metrics,
-        patience=args.patience,
-        min_delta=args.min_delta,
+        metrics=stopping_metrics, patience=args.patience, min_delta=args.min_delta
     )
     precision = "16-mixed" if torch.cuda.is_available() else "32-true"
     dl.Trainer(
@@ -405,10 +379,7 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         print(f"Model saved to {args.model_path}")
 
         # Save companion JSON so label_images.py can reconstruct the architecture
-        config = {
-            "n_transforms": args.n_transforms,
-            "num_outputs": args.num_outputs,
-        }
+        config = {"n_transforms": args.n_transforms, "num_outputs": args.num_outputs}
         config_path = os.path.splitext(args.model_path)[0] + ".json"
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)

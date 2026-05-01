@@ -57,9 +57,7 @@ def parse_and_calc_hexatic(filename, verbose=1):
 
         # Calculate Hexatic Order
         hex_comp = freud.order.Hexatic(k=6)
-        hex_comp.compute(
-            system=(current_box, positions), neighbors={"num_neighbors": 6}
-        )
+        hex_comp.compute(system=(current_box, positions), neighbors={"num_neighbors": 6})
 
         # Magnitude of psi6 for each atom
         mag_psi6 = np.abs(hex_comp.particle_order)
@@ -73,9 +71,7 @@ def parse_and_calc_hexatic(filename, verbose=1):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Compute hexatic order from a LAMMPS dump file."
-    )
+    parser = argparse.ArgumentParser(description="Compute hexatic order from a LAMMPS dump file.")
     parser.add_argument(
         "filename", nargs="?", default="dump.lammps", help="Path to LAMMPS dump file"
     )

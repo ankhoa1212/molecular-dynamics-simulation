@@ -20,12 +20,10 @@ def main():
         "filename",
         nargs="?",
         help="Specific LAMMPS trajectory file to process. "
-             "If not provided, processes all in results/.",
+        "If not provided, processes all in results/.",
     )
     parser.add_argument("--output_dir", default=None, help="Output directory")
-    parser.add_argument(
-        "--no-show", action="store_true", help="Do not display the graph"
-    )
+    parser.add_argument("--no-show", action="store_true", help="Do not display the graph")
     args = parser.parse_args()
 
     if args.filename:
@@ -49,7 +47,7 @@ def main():
         plt.tight_layout()
 
         if "." in filename:
-            base = filename[:filename.rfind(".")]
+            base = filename[: filename.rfind(".")]
         else:
             base = filename
 

@@ -11,9 +11,7 @@ from ovito.io import import_file
 from ovito.vis import Viewport, TachyonRenderer
 
 
-def convert_trajectory_to_video(
-    input_file, output_file=None, width=1920, height=1080, fps=30
-):
+def convert_trajectory_to_video(input_file, output_file=None, width=1920, height=1080, fps=30):
     """
     Convert a LAMMPS trajectory file to an AVI video.
 
@@ -58,10 +56,7 @@ def convert_trajectory_to_video(
 
         # Render the animation to video
         viewport.render_anim(
-            filename=str(output_file),
-            size=(width, height),
-            renderer=TachyonRenderer(),
-            fps=fps,
+            filename=str(output_file), size=(width, height), renderer=TachyonRenderer(), fps=fps
         )
 
         print(f"Successfully created: {output_file}")
@@ -148,9 +143,7 @@ Examples:
     )
 
     parser.add_argument(
-        "-o",
-        "--output",
-        help="Output file path (for single file) or output directory (for folder)",
+        "-o", "--output", help="Output file path (for single file) or output directory (for folder)"
     )
 
     parser.add_argument(
@@ -158,15 +151,10 @@ Examples:
     )
 
     parser.add_argument(
-        "--height",
-        type=int,
-        default=1080,
-        help="Video height in pixels (default: 1080)",
+        "--height", type=int, default=1080, help="Video height in pixels (default: 1080)"
     )
 
-    parser.add_argument(
-        "--fps", type=int, default=30, help="Frames per second (default: 30)"
-    )
+    parser.add_argument("--fps", type=int, default=30, help="Frames per second (default: 30)")
 
     args = parser.parse_args()
 
@@ -179,9 +167,7 @@ Examples:
     # Check if input is a file or directory
     if input_path.is_file():
         # Convert single file
-        convert_trajectory_to_video(
-            input_path, args.output, args.width, args.height, args.fps
-        )
+        convert_trajectory_to_video(input_path, args.output, args.width, args.height, args.fps)
     elif input_path.is_dir():
         # Process all files in directory
         process_folder(input_path, args.output, args.width, args.height, args.fps)

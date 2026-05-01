@@ -5,14 +5,15 @@ from yolov12.utils.general import non_max_suppression, scale_coords
 from yolov12.utils.metrics import ap_per_class
 from yolov12.utils.torch_utils import select_device
 
-def evaluate_yolov12(weights, data, img_size=640, conf_thres=0.001, iou_thres=0.6, device=''):
+
+def evaluate_yolov12(weights, data, img_size=640, conf_thres=0.001, iou_thres=0.6, device=""):
     # Load model
     device = select_device(device)
     model = attempt_load(weights, map_location=device)
     model.eval()
 
     # Load validation data
-    dataset = LoadImagesAndLabels(data['val'], img_size, batch_size=1, rect=True)
+    dataset = LoadImagesAndLabels(data["val"], img_size, batch_size=1, rect=True)
     iouv = torch.linspace(0.5, 0.95, 10).to(device)  # mAP@0.5:0.95
 
     stats = []
@@ -37,17 +38,27 @@ def evaluate_yolov12(weights, data, img_size=640, conf_thres=0.001, iou_thres=0.
                 # TODO: implement matching logic for correct detections
             else:
                 correct = torch.zeros(0, iouv.numel(), dtype=torch.bool, device=device)
-            stats.append((correct.cpu(), det[:, 4].cpu() if det is not None else torch.Tensor(), det[:, 5].cpu() if det is not None else torch.Tensor(), tcls))
+            stats.append(
+                (
+                    correct.cpu(),
+                    det[:, 4].cpu() if det is not None else torch.Tensor(),
+                    det[:, 5].cpu() if det is not None else torch.Tensor(),
+                    tcls,
+                )
+            )
 
     # Compute metrics
     stats = [np.concatenate(x, 0) for x in zip(*stats)]
     if len(stats) and stats[0].any():
         p, r, ap, f1, ap_class = ap_per_class(*stats, plot=False, save_dir=None)
-        print(f"Precision: {p.mean():.4f}, Recall: {r.mean():.4f}, mAP@0.5: {ap[:, 0].mean():.4f}, mAP@0.5:0.95: {ap.mean():.4f}")
+        print(
+            f"Precision: {p.mean():.4f}, Recall: {r.mean():.4f}, mAP@0.5: {ap[:, 0].mean():.4f}, mAP@0.5:0.95: {ap.mean():.4f}"
+        )
     else:
         print("No detections.")
 
+
 if __name__ == "__main__":
-    weights = 'yolov12.pt'
-    data = {'val': 'data/val.txt'}  # Update with your validation data path
+    weights = "yolov12.pt"
+    data = {"val": "data/val.txt"}  # Update with your validation data path
     evaluate_yolov12(weights, data)

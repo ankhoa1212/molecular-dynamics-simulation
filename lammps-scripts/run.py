@@ -57,9 +57,7 @@ def _parse_json_config(config_file):
                 # Determine flag prefix
                 prefix = "-" if len(key) == 1 else "--"
                 # If key doesn't start with -, add prefix
-                arg_name = (
-                    key if key.startswith("-") else f"{prefix}{key}"
-                )
+                arg_name = key if key.startswith("-") else f"{prefix}{key}"
                 config_args.append(arg_name)
                 config_args.append(str(value))
     return config_args
@@ -96,11 +94,7 @@ def parse_config(argv_list):
                     config_args = _parse_text_config(config_file)
 
                 # Replace --config and its value with the file arguments
-                args_list = (
-                    args_list[:config_index]
-                    + config_args
-                    + args_list[config_index + 2 :]
-                )
+                args_list = args_list[:config_index] + config_args + args_list[config_index + 2 :]
             else:
                 print("Error: --config requires a file path")
                 sys.exit(1)
@@ -114,9 +108,7 @@ def setup_arg_parser():
     """Sets up the argument parser."""
     parser = argparse.ArgumentParser(description="Run LAMMPS simulation.")
 
-    parser.add_argument(
-        "--config", help="Path to file containing arguments", required=False
-    )
+    parser.add_argument("--config", help="Path to file containing arguments", required=False)
     parser.add_argument("input_file", help="LAMMPS input file")
     parser.add_argument("output_dir", nargs="?", help="Output directory")
     parser.add_argument("molecules", nargs="?", help="Start molecules")
@@ -147,11 +139,9 @@ def setup_arg_parser():
         dest="vel_force_scale",
         default=None,
         help="Scaling factor for initial velocity or continuous "
-             "force (default: 9 for velocity_initialization.in, 1.0 for continuous_force.in)",
+        "force (default: 9 for velocity_initialization.in, 1.0 for continuous_force.in)",
     )
-    parser.add_argument(
-        "--steps", default="10000", help="Simulation steps (default: 10000)"
-    )
+    parser.add_argument("--steps", default="10000", help="Simulation steps (default: 10000)")
     return parser
 
 
@@ -189,9 +179,7 @@ def resolve_arguments(args):
     if args.molecules is not None:
         config["m_start"] = int(args.molecules)
         config["m_end"] = (
-            int(args.molecules_end)
-            if args.molecules_end is not None
-            else config["m_start"]
+            int(args.molecules_end) if args.molecules_end is not None else config["m_start"]
         )
         step = args.molecules_step if args.molecules_step is not None else "1"
         config["m_step"] = int(step)
@@ -199,9 +187,7 @@ def resolve_arguments(args):
     if args.var_epsilon is not None:
         config["e_start"] = float(args.var_epsilon)
         config["e_end"] = (
-            float(args.var_epsilon_end)
-            if args.var_epsilon_end is not None
-            else config["e_start"]
+            float(args.var_epsilon_end) if args.var_epsilon_end is not None else config["e_start"]
         )
         step = args.var_epsilon_step if args.var_epsilon_step is not None else "1"
         config["e_step"] = float(step)
@@ -259,12 +245,8 @@ def generate_commands(config, args, lammps_executable):
             filename = f"{base_script_name}_{m}_{epsilon_val}"
             log_file = os.path.join(log_dir, f"{filename}.log")
 
-            current_tstart = (
-                epsilon_val if args.var_tstart == "epsilon" else args.var_tstart
-            )
-            current_tstop = (
-                epsilon_val if args.var_tstop == "epsilon" else args.var_tstop
-            )
+            current_tstart = epsilon_val if args.var_tstart == "epsilon" else args.var_tstart
+            current_tstop = epsilon_val if args.var_tstop == "epsilon" else args.var_tstop
 
             cmd = (
                 f'"{lammps_executable}" -in "{config["input_script"]}" '
@@ -303,8 +285,7 @@ def run_parallel_tasks(commands, output_dir, max_workers):
     print(f"Running simulations in parallel with up to {max_workers} jobs...")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
-            executor.submit(run_simulation, cmd, filename, output_dir)
-            for cmd, filename in commands
+            executor.submit(run_simulation, cmd, filename, output_dir) for cmd, filename in commands
         ]
         for future in futures:
             future.result()  # Wait for all to complete
@@ -366,9 +347,7 @@ def main():
     print(f"  Output dir: {config['output_dir']}")
     print("=" * 100)
 
-    commands, base_script_name, log_dir = generate_commands(
-        config, args, lammps_executable
-    )
+    commands, base_script_name, log_dir = generate_commands(config, args, lammps_executable)
     print(f"  Log dir:    {log_dir}")
     print("=" * 100)
 
@@ -383,7 +362,6 @@ def main():
     print(f"Check the log directory '{log_dir}' for details.")
 
     print_visualization_commands(config, base_script_name)
-
 
 
 if __name__ == "__main__":

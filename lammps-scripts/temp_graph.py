@@ -21,7 +21,7 @@ def generate_temp_graph_filename(filename, ending, output_dir=None):
     # Get base filename without extension
     base_name = os.path.basename(filename)
     if "." in base_name:
-        base_name = base_name[:base_name.rfind(".")]
+        base_name = base_name[: base_name.rfind(".")]
 
     out_name = f"{base_name}_temp_graph_{ending}.png"
 
@@ -101,9 +101,7 @@ def _process_atom_lines(atom_lines):
     for line in atom_lines:
         parts = line.split()
         # x, y, vx, vy are indices 2, 3, 4, 5
-        data_list.append([
-            float(parts[2]), float(parts[3]), float(parts[4]), float(parts[5])
-        ])
+        data_list.append([float(parts[2]), float(parts[3]), float(parts[4]), float(parts[5])])
 
     data_arr = np.array(data_list)
     return data_arr[:, 0], data_arr[:, 1], data_arr[:, 2], data_arr[:, 3]
@@ -115,15 +113,15 @@ def _compute_radial_projection(x, y, vx, vy):
     center_y = 100.0
     dx = x - center_x
     dy = y - center_y
-    dist = np.sqrt(dx**2 + dy**2)
+    dist = np.sqrt(dx ** 2 + dy ** 2)
 
     with np.errstate(divide="ignore", invalid="ignore"):
         rx = np.divide(dx, dist, out=np.zeros_like(dx), where=dist != 0)
         ry = np.divide(dy, dist, out=np.zeros_like(dy), where=dist != 0)
 
     v_rad = vx * rx + vy * ry
-    v_sq = vx**2 + vy**2
-    v_tan_sq = v_sq - v_rad**2
+    v_sq = vx ** 2 + vy ** 2
+    v_tan_sq = v_sq - v_rad ** 2
     return v_rad, v_sq, v_tan_sq
 
 
@@ -146,7 +144,7 @@ def _compute_frame_temperature(x, y, vx, vy, n_atoms):
     v_rad_fluctuation = v_rad - mean_v_rad
 
     # Re-calculate Total Kinetic Energy using the FLUCTUATIONS only
-    corrected_sq_sum = np.sum(v_tan_sq + v_rad_fluctuation**2)
+    corrected_sq_sum = np.sum(v_tan_sq + v_rad_fluctuation ** 2)
     t_corrected = corrected_sq_sum / (2.0 * n_atoms)
 
     return t_tot, t_corrected
@@ -234,9 +232,7 @@ if __name__ == "__main__":
     # ex = '.../test_same/logs/test.in_100_5.0.log'
     parser.add_argument("--filename", "-f", default=ex, help="Path to file")
     parser.add_argument("--output_dir", default=None, help="Output directory")
-    parser.add_argument(
-        "--no-show", action="store_true", help="Do not display the graph"
-    )
+    parser.add_argument("--no-show", action="store_true", help="Do not display the graph")
     args = parser.parse_args()
     if args.filename.endswith(".log"):
         plot_log_temperature(args.filename, args.output_dir, args.no_show)

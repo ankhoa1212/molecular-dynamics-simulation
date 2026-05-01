@@ -2,6 +2,7 @@
 Shared utilities for parsing LAMMPS dump files.
 """
 
+
 def parse_lammps_dump(filename):
     """
     Generator that yields simulation frames from a LAMMPS dump file.
@@ -57,5 +58,5 @@ def parse_lammps_dump(filename):
                     "n_atoms": n_atoms,
                     "box_bounds": box_lines,
                     "atom_header": atom_header,
-                    "atoms": atom_lines
+                    "atoms": atom_lines,
                 }

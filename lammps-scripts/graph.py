@@ -64,22 +64,15 @@ def main():
     Main function to parse arguments and run the analysis scripts.
     It supports processing a single file or a directory.
     """
-    parser = argparse.ArgumentParser(
-        description="Run analysis scripts on LAMMPS trajectory files."
-    )
+    parser = argparse.ArgumentParser(description="Run analysis scripts on LAMMPS trajectory files.")
     parser.add_argument(
         "input_path", help="Path to a .lammpstrj file or a directory containing them."
     )
     parser.add_argument(
-        "--output_dir",
-        "-o",
-        default=None,
-        help="Optional output directory for graphs.",
+        "--output_dir", "-o", default=None, help="Optional output directory for graphs."
     )
     parser.add_argument(
-        "--no-show",
-        action="store_true",
-        help="Do not display the graphs interactively.",
+        "--no-show", action="store_true", help="Do not display the graphs interactively."
     )
     args = parser.parse_args()
 

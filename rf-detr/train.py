@@ -58,19 +58,17 @@ def main() -> None:
 
     @callbacks.register("on_fit_epoch_end")
     def _log_metrics(trainer) -> None:
-        metrics = {
-            k: float(v)
-            for k, v in trainer.metrics.items()
-            if isinstance(v, (int, float))
-        }
+        metrics = {k: float(v) for k, v in trainer.metrics.items() if isinstance(v, (int, float))}
         log_epoch_metrics(metrics, step=trainer.epoch)
 
     variant = model_cfg["variant"].lower()
     if variant == "base":
         from rfdetr import RFDETRBase
+
         model = RFDETRBase()
     elif variant == "large":
         from rfdetr import RFDETRLarge
+
         model = RFDETRLarge()
     else:
         raise ValueError(f"Unknown model variant {variant!r}. Choose 'base' or 'large'.")

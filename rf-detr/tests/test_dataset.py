@@ -39,10 +39,38 @@ def sample_dataset(tmp_path):
             {"id": 4, "file_name": "trial3_frame_000.png", "width": 640, "height": 480},
         ],
         annotations=[
-            {"id": 1, "image_id": 1, "category_id": 1, "bbox": [10, 10, 20, 20], "area": 400, "iscrowd": 0},
-            {"id": 2, "image_id": 2, "category_id": 1, "bbox": [30, 30, 20, 20], "area": 400, "iscrowd": 0},
-            {"id": 3, "image_id": 3, "category_id": 1, "bbox": [50, 50, 20, 20], "area": 400, "iscrowd": 0},
-            {"id": 4, "image_id": 4, "category_id": 1, "bbox": [70, 70, 20, 20], "area": 400, "iscrowd": 0},
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [10, 10, 20, 20],
+                "area": 400,
+                "iscrowd": 0,
+            },
+            {
+                "id": 2,
+                "image_id": 2,
+                "category_id": 1,
+                "bbox": [30, 30, 20, 20],
+                "area": 400,
+                "iscrowd": 0,
+            },
+            {
+                "id": 3,
+                "image_id": 3,
+                "category_id": 1,
+                "bbox": [50, 50, 20, 20],
+                "area": 400,
+                "iscrowd": 0,
+            },
+            {
+                "id": 4,
+                "image_id": 4,
+                "category_id": 1,
+                "bbox": [70, 70, 20, 20],
+                "area": 400,
+                "iscrowd": 0,
+            },
         ],
     )
     (tmp_path / "annotations.json").write_text(json.dumps(coco))
@@ -131,9 +159,7 @@ def test_image_symlinks_created_in_split_dirs(sample_dataset, tmp_path):
 def test_warns_on_unmatched_image(sample_dataset, tmp_path):
     coco_path = sample_dataset / "annotations.json"
     coco = json.loads(coco_path.read_text())
-    coco["images"].append(
-        {"id": 99, "file_name": "unknown_frame.png", "width": 640, "height": 480}
-    )
+    coco["images"].append({"id": 99, "file_name": "unknown_frame.png", "width": 640, "height": 480})
     (sample_dataset / "images" / "unknown_frame.png").write_bytes(b"fake")
     coco_path.write_text(json.dumps(coco))
 

@@ -1,0 +1,72 @@
+[MASTER]
+jobs=0
+unsafe-load-any-extension=no
+extension-pkg-allow-list=
+
+[MESSAGES CONTROL]
+# Disable checks that are noisy or less critical for a research/ML project
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-many-arguments,
+    too-many-instance-attributes,
+    too-few-public-methods,
+    no-self-argument,
+    suppressed-message,
+    useless-suppression,
+    import-outside-toplevel,
+    duplicate-code,
+    unspecified-encoding,
+
+[FORMAT]
+max-line-length=100
+indent-string='    '
+indent-after-paren=4
+
+[VARIABLES]
+dummy-variables-rgx=_+
+
+[DESIGN]
+max-locals=15
+max-branches=12
+max-statements=50
+max-attributes=7
+min-public-methods=1
+max-public-methods=20
+
+[IMPORTS]
+allow-wildcard-with-all=no
+allow-reexport-from-package=yes
+
+[SIMILARITIES]
+min-similarity-lines=5
+ignore-comments=no
+ignore-docstrings=yes
+ignore-imports=yes
+
+[MISCELLANEOUS]
+notes=FIXME,XXX,TODO
+
+[LOGGING]
+logging-format-style=new
+
+[BASIC]
+good-names=
+    i,j,k,x,y,z,
+    f,e,ax,
+    _,df,np,pd,plt,
+    cv2,lr,
+    a,b,c,d,n,m,p,q,r,s,t,u,v,w,
+
+argument-naming-style=snake_case
+attr-naming-style=snake_case
+class-naming-style=PascalCase
+const-naming-style=UPPER_CASE
+function-naming-style=snake_case
+method-naming-style=snake_case
+module-naming-style=snake_case
+variable-naming-style=snake_case
+
+[SPELLING]
+spelling-store-unknown-words=no

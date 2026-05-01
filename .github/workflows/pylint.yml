@@ -15,6 +15,7 @@ jobs:
     env:
       INSTALL_DATA_SETUP_DEPS: "false"
       INSTALL_RF_DETR_DEPS: "false"
+      INSTALL_LAMMPS_DEPS: "false"
 
     steps:
       - name: Checkout
@@ -42,7 +43,11 @@ jobs:
           pip install pylint black
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ "$INSTALL_DATA_SETUP_DEPS" = "true" ] && [ -f data-setup/requirements.txt ]; then pip install -r data-setup/requirements.txt; fi
-          if [ -f lammps-scripts/requirements.txt ]; then pip install -r lammps-scripts/requirements.txt; fi
+          if [ "$INSTALL_LAMMPS_DEPS" = "true" ] && [ -f lammps-scripts/requirements.txt ]; then
+            pip install -r lammps-scripts/requirements.txt
+          else
+            echo "Skipping lammps-scripts deps (set INSTALL_LAMMPS_DEPS=true to enable)"
+          fi
           if [ -f yolov12/pyproject.toml ]; then pip install -e yolov12; fi
           if [ "$INSTALL_RF_DETR_DEPS" = "true" ] && [ -f rf-detr/pyproject.toml ]; then pip install -e rf-detr; fi
 

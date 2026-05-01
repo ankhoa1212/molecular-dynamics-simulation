@@ -1,0 +1,177 @@
+name: Pylint & Black
+
+on:
+  push:
+    paths:
+      - "**/*.py"
+  pull_request:
+    paths:
+      - "**/*.py"
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      INSTALL_DATA_SETUP_DEPS: "false"
+      INSTALL_RF_DETR_DEPS: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies and tools
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install pylint black
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ "$INSTALL_DATA_SETUP_DEPS" = "true" ] && [ -f data-setup/requirements.txt ]; then pip install -r data-setup/requirements.txt; fi
+          if [ -f lammps-scripts/requirements.txt ]; then pip install -r lammps-scripts/requirements.txt; fi
+          if [ -f yolov12/pyproject.toml ]; then pip install -e yolov12; fi
+          if [ "$INSTALL_RF_DETR_DEPS" = "true" ] && [ -f rf-detr/pyproject.toml ]; then pip install -e rf-detr; fi
+
+      - name: Determine files to lint
+        id: files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PR: only lint changed files
+            FILES=$(git diff --name-only origin/${{ github.base_ref }} -- '*.py' | tr '\n' ' ')
+            echo "scope=PR (changed files only)" >> $GITHUB_OUTPUT
+          else
+            # Push or manual: lint all tracked files
+            FILES=$(git ls-files '*.py' | tr '\n' ' ')
+            echo "scope=Full repository" >> $GITHUB_OUTPUT
+          fi
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+
+      - name: Check Black formatting
+        continue-on-error: true
+        run: |
+          if [ -z "${{ steps.files.outputs.files }}" ]; then
+            echo "::notice::No Python files to check"
+            exit 0
+          fi
+          black --check --line-length=100 ${{ steps.files.outputs.files }} || true
+
+      - name: Run pylint (parallel)
+        id: pylint
+        continue-on-error: true
+        run: |
+          if [ -z "${{ steps.files.outputs.files }}" ]; then
+            echo "::notice::No Python files to lint"
+            exit 0
+          fi
+          
+          mkdir -p lint-reports
+          
+          # Run pylint with parallel execution
+          pylint --jobs=0 \
+            --output-format=json:lint-reports/pylint.json \
+            ${{ steps.files.outputs.files }} || true
+          
+          # Also generate human-readable report
+          pylint --output-format=text \
+            ${{ steps.files.outputs.files }} > lint-reports/pylint.txt 2>&1 || true
+
+      - name: Generate lint summary
+        if: always()
+        run: |
+          python << 'EOF'
+          import json
+          import os
+          import sys
+          
+          report_file = "lint-reports/pylint.json"
+          
+          if not os.path.exists(report_file):
+            print("::notice::No lint report generated")
+            sys.exit(0)
+          
+          try:
+            with open(report_file) as f:
+              results = json.load(f)
+          except (json.JSONDecodeError, FileNotFoundError):
+            print("::notice::Could not parse lint report")
+            sys.exit(0)
+          
+          # Group by message type
+          stats = {}
+          for msg in results:
+            msg_type = msg.get("type", "unknown")
+            stats[msg_type] = stats.get(msg_type, 0) + 1
+          
+          # Generate summary
+          total = len(results)
+          summary_lines = [
+            f"## Pylint Summary",
+            f"**Scope:** ${{ steps.files.outputs.scope }}",
+            f"**Total Issues:** {total}",
+            ""
+          ]
+          
+          if stats:
+            summary_lines.append("### Breakdown by severity:")
+            for msg_type in sorted(stats.keys()):
+              count = stats[msg_type]
+              summary_lines.append(f"- **{msg_type}**: {count}")
+          else:
+            summary_lines.append("✅ No issues found!")
+          
+          summary = "\n".join(summary_lines)
+          print(summary)
+          
+          # Write to file for potential metric tracking
+          with open("lint-reports/summary.md", "w") as f:
+            f.write(summary)
+          
+          # Post as workflow annotation
+          print(f"::notice::{summary}")
+          
+          # Optionally fail only on errors (not warnings/conventions)
+          errors = stats.get("error", 0) + stats.get("fatal", 0)
+          if errors > 0:
+            print(f"::warning::Found {errors} pylint errors")
+          
+          EOF
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: lint-reports/
+          retention-days: 30
+
+      - name: Post PR comment (on PR)
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const summary = fs.readFileSync('lint-reports/summary.md', 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            } catch (e) {
+              console.log('Could not post comment:', e);
+            }

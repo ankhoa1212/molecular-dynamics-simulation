@@ -17,8 +17,6 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,136 +27,77 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.11-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-3.11-
+          cache: 'pip' # Built-in caching is more reliable than manual cache steps
 
       - name: Install dependencies and tools
         run: |
           python -m pip install --upgrade pip setuptools
           pip install pylint black
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ "$INSTALL_DATA_SETUP_DEPS" = "true" ] && [ -f data-setup/requirements.txt ]; then pip install -r data-setup/requirements.txt; fi
-          if [ "$INSTALL_LAMMPS_DEPS" = "true" ] && [ -f lammps-scripts/requirements.txt ]; then
-            pip install -r lammps-scripts/requirements.txt
-          else
-            echo "Skipping lammps-scripts deps (set INSTALL_LAMMPS_DEPS=true to enable)"
-          fi
-          if [ -f yolov12/pyproject.toml ]; then pip install -e yolov12; fi
-          if [ "$INSTALL_RF_DETR_DEPS" = "true" ] && [ -f rf-detr/pyproject.toml ]; then pip install -e rf-detr; fi
+          [ -f requirements.txt ] && pip install -r requirements.txt
+          [ "$INSTALL_DATA_SETUP_DEPS" = "true" ] && [ -f data-setup/requirements.txt ] && pip install -r data-setup/requirements.txt
+          [ -f yolov12/pyproject.toml ] && pip install -e yolov12
+          [ "$INSTALL_RF_DETR_DEPS" = "true" ] && [ -f rf-detr/pyproject.toml ] && pip install -e rf-detr
 
       - name: Determine files to lint
         id: files
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # PR: only lint changed files
-            if git fetch origin ${{ github.base_ref }} --depth=1; then
-              FILES=$(git diff --name-only origin/${{ github.base_ref }} -- '*.py' | tr '\n' ' ')
-            else
-              echo "::warning::Could not fetch base ref; falling back to full repo lint"
-              FILES=$(git ls-files '*.py' | tr '\n' ' ')
-            fi
+            git fetch origin ${{ github.base_ref }} --depth=1
+            # Using grep to avoid issues with empty diffs
+            FILES=$(git diff --name-only origin/${{ github.base_ref }} -- | grep '\.py$' || true)
             echo "scope=PR (changed files only)" >> $GITHUB_OUTPUT
           else
-            # Push or manual: lint all tracked files
-            FILES=$(git ls-files '*.py' | tr '\n' ' ')
+            FILES=$(git ls-files '*.py')
             echo "scope=Full repository" >> $GITHUB_OUTPUT
           fi
-          echo "files=$FILES" >> $GITHUB_OUTPUT
+          # Multiline output handling for many files
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Check Black formatting
-        continue-on-error: true
+        if: steps.files.outputs.files != ''
         run: |
-          if [ -z "${{ steps.files.outputs.files }}" ]; then
-            echo "::notice::No Python files to check"
-            exit 0
-          fi
-          black --check --line-length=100 ${{ steps.files.outputs.files }} || true
+          # Use xargs to handle long file lists and maintain return codes
+          echo "${{ steps.files.outputs.files }}" | xargs black --check --line-length=100
 
-      - name: Run pylint (parallel)
+      - name: Run pylint
         id: pylint
+        if: steps.files.outputs.files != ''
         continue-on-error: true
         run: |
-          if [ -z "${{ steps.files.outputs.files }}" ]; then
-            echo "::notice::No Python files to lint"
-            exit 0
-          fi
-          
           mkdir -p lint-reports
-          
-          # Run pylint with parallel execution
-          pylint --jobs=0 --rcfile=.pylintrc \
-            --output-format=json:lint-reports/pylint.json \
-            ${{ steps.files.outputs.files }} || true
-          
-          # Also generate human-readable report
-          pylint --rcfile=.pylintrc --output-format=text \
-            ${{ steps.files.outputs.files }} > lint-reports/pylint.txt 2>&1 || true
+          echo "${{ steps.files.outputs.files }}" | xargs pylint --jobs=0 --rcfile=.pylintrc \
+            --output-format=json:lint-reports/pylint.json,text:lint-reports/pylint.txt || true
 
       - name: Generate lint summary
-        if: always()
+        if: always() && steps.files.outputs.files != ''
         run: |
           python << 'EOF'
-          import json
-          import os
-          import sys
-          
+          import json, os, sys
           report_file = "lint-reports/pylint.json"
-          
           if not os.path.exists(report_file):
-            print("::notice::No lint report generated")
-            sys.exit(0)
+              print("### Pylint: No report found")
+              sys.exit(0)
+          with open(report_file) as f:
+              try:
+                  results = json.load(f)
+              except:
+                  results = []
           
-          try:
-            with open(report_file) as f:
-              results = json.load(f)
-          except (json.JSONDecodeError, FileNotFoundError):
-            print("::notice::Could not parse lint report")
-            sys.exit(0)
-          
-          # Group by message type
           stats = {}
           for msg in results:
-            msg_type = msg.get("type", "unknown")
-            stats[msg_type] = stats.get(msg_type, 0) + 1
+              t = msg.get("type", "unknown")
+              stats[t] = stats.get(t, 0) + 1
           
-          # Generate summary
-          total = len(results)
-          summary_lines = [
-            f"## Pylint Summary",
-            f"**Scope:** ${{ steps.files.outputs.scope }}",
-            f"**Total Issues:** {total}",
-            ""
-          ]
-          
+          summary = [f"## Pylint Summary", f"**Scope:** ${{ steps.files.outputs.scope }}", f"**Total Issues:** {len(results)}\n"]
           if stats:
-            summary_lines.append("### Breakdown by severity:")
-            for msg_type in sorted(stats.keys()):
-              count = stats[msg_type]
-              summary_lines.append(f"- **{msg_type}**: {count}")
+              summary.extend([f"- **{k}**: {v}" for k, v in sorted(stats.items())])
           else:
-            summary_lines.append("✅ No issues found!")
+              summary.append("✅ No issues found!")
           
-          summary = "\n".join(summary_lines)
-          print(summary)
-          
-          # Write to file for potential metric tracking
-          with open("lint-reports/summary.md", "w") as f:
-            f.write(summary)
-          
-          # Post as workflow annotation
-          print(f"::notice::{summary}")
-          
-          # Optionally fail only on errors (not warnings/conventions)
-          errors = stats.get("error", 0) + stats.get("fatal", 0)
-          if errors > 0:
-            print(f"::warning::Found {errors} pylint errors")
-          
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write("\n".join(summary))
           EOF
 
       - name: Upload lint reports
@@ -170,63 +109,38 @@ jobs:
           retention-days: 30
 
   lint-lammps:
-    # Run pylint for lammps-scripts using Python 3.8 and its requirements
+    # CRITICAL: Access env via the env context in 'if'
+    if: github.env.INSTALL_LAMMPS_DEPS == 'true' || vars.INSTALL_LAMMPS_DEPS == 'true' || env.INSTALL_LAMMPS_DEPS == 'true'
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.8
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.8"
           cache: "pip"
 
-      - name: Cache pip packages
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.8-${{ hashFiles('**/lammps-scripts/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-3.8-
-
-      - name: Install lammps deps and pylint
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
+      - name: Install lammps deps
         run: |
-          python -m pip install --upgrade pip setuptools
           pip install pylint
-          if [ -f lammps-scripts/requirements.txt ]; then pip install --cache-dir ~/.cache/pip -r lammps-scripts/requirements.txt; fi
-
-      - name: Find lammps python files
-        id: files-lammps
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
-        run: |
-          FILES=$(git ls-files | grep '^lammps-scripts/.*\.py$' || true)
-          echo "files=$FILES" >> $GITHUB_OUTPUT
+          [ -f lammps-scripts/requirements.txt ] && pip install -r lammps-scripts/requirements.txt
 
       - name: Run pylint for lammps-scripts
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
         continue-on-error: true
         run: |
-          if [ -z "${{ steps.files-lammps.outputs.files }}" ]; then
-            echo "::notice::No lammps Python files to lint"
-            exit 0
-          fi
+          FILES=$(git ls-files | grep '^lammps-scripts/.*\.py$' || true)
+          if [ -z "$FILES" ]; then exit 0; fi
           mkdir -p lint-reports-lammps
-          pylint --jobs=0 --rcfile=.pylintrc --output-format=json:lint-reports-lammps/pylint.json ${{ steps.files-lammps.outputs.files }} || true
-          pylint --rcfile=.pylintrc --output-format=text ${{ steps.files-lammps.outputs.files }} > lint-reports-lammps/pylint.txt 2>&1 || true
+          echo "$FILES" | xargs pylint --jobs=0 --rcfile=.pylintrc \
+            --output-format=json:lint-reports-lammps/pylint.json,text:lint-reports-lammps/pylint.txt || true
 
       - name: Upload lammps lint reports
-        if: always() && env.INSTALL_LAMMPS_DEPS == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lint-reports-lammps
           path: lint-reports-lammps/
-          retention-days: 30
-      # PR comment step removed for simplicity; reports are uploaded as artifacts instead.

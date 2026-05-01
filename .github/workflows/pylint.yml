@@ -9,15 +9,13 @@ on:
       - "**/*.py"
   workflow_dispatch:
 
-env:
-  INSTALL_DATA_SETUP_DEPS: "false"
-  INSTALL_RF_DETR_DEPS: "false"
-  INSTALL_LAMMPS_DEPS: "false"
-
 jobs:
   lint:
     runs-on: ubuntu-latest
-    
+    env:
+      INSTALL_DATA_SETUP_DEPS: "false"
+      INSTALL_RF_DETR_DEPS: "false"
+      INSTALL_LAMMPS_DEPS: "false"
 
     steps:
       - name: Checkout
@@ -29,15 +27,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.11-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
           restore-keys: |
-            ${{ runner.os }}-pip-3.11-
-
+            ${{ runner.os }}-pip-
       - name: Install dependencies and tools
         run: |
           python -m pip install --upgrade pip setuptools
@@ -51,18 +49,12 @@ jobs:
           fi
           if [ -f yolov12/pyproject.toml ]; then pip install -e yolov12; fi
           if [ "$INSTALL_RF_DETR_DEPS" = "true" ] && [ -f rf-detr/pyproject.toml ]; then pip install -e rf-detr; fi
-
       - name: Determine files to lint
         id: files
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             # PR: only lint changed files
-            if git fetch origin ${{ github.base_ref }} --depth=1; then
-              FILES=$(git diff --name-only origin/${{ github.base_ref }} -- '*.py' | tr '\n' ' ')
-            else
-              echo "::warning::Could not fetch base ref; falling back to full repo lint"
-              FILES=$(git ls-files '*.py' | tr '\n' ' ')
-            fi
+            FILES=$(git diff --name-only origin/${{ github.base_ref }} -- '*.py' | tr '\n' ' ')
             echo "scope=PR (changed files only)" >> $GITHUB_OUTPUT
           else
             # Push or manual: lint all tracked files
@@ -70,7 +62,6 @@ jobs:
             echo "scope=Full repository" >> $GITHUB_OUTPUT
           fi
           echo "files=$FILES" >> $GITHUB_OUTPUT
-
       - name: Check Black formatting
         continue-on-error: true
         run: |
@@ -79,7 +70,6 @@ jobs:
             exit 0
           fi
           black --check --line-length=100 ${{ steps.files.outputs.files }} || true
-
       - name: Run pylint (parallel)
         id: pylint
         continue-on-error: true
@@ -92,14 +82,13 @@ jobs:
           mkdir -p lint-reports
           
           # Run pylint with parallel execution
-          pylint --jobs=0 --rcfile=.pylintrc \
+          pylint --jobs=0 \
             --output-format=json:lint-reports/pylint.json \
             ${{ steps.files.outputs.files }} || true
           
           # Also generate human-readable report
-          pylint --rcfile=.pylintrc --output-format=text \
+          pylint --output-format=text \
             ${{ steps.files.outputs.files }} > lint-reports/pylint.txt 2>&1 || true
-
       - name: Generate lint summary
         if: always()
         run: |
@@ -160,7 +149,6 @@ jobs:
             print(f"::warning::Found {errors} pylint errors")
           
           EOF
-
       - name: Upload lint reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -168,65 +156,3 @@ jobs:
           name: lint-reports
           path: lint-reports/
           retention-days: 30
-
-  lint-lammps:
-    # Run pylint for lammps-scripts using Python 3.8 and its requirements
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python 3.8
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.8"
-          cache: "pip"
-
-      - name: Cache pip packages
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.8-${{ hashFiles('**/lammps-scripts/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-3.8-
-
-      - name: Install lammps deps and pylint
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
-        run: |
-          python -m pip install --upgrade pip setuptools
-          pip install pylint
-          if [ -f lammps-scripts/requirements.txt ]; then pip install --cache-dir ~/.cache/pip -r lammps-scripts/requirements.txt; fi
-
-      - name: Find lammps python files
-        id: files-lammps
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
-        run: |
-          FILES=$(git ls-files | grep '^lammps-scripts/.*\.py$' || true)
-          echo "files=$FILES" >> $GITHUB_OUTPUT
-
-      - name: Run pylint for lammps-scripts
-        if: ${{ env.INSTALL_LAMMPS_DEPS == 'true' }}
-        continue-on-error: true
-        run: |
-          if [ -z "${{ steps.files-lammps.outputs.files }}" ]; then
-            echo "::notice::No lammps Python files to lint"
-            exit 0
-          fi
-          mkdir -p lint-reports-lammps
-          pylint --jobs=0 --rcfile=.pylintrc --output-format=json:lint-reports-lammps/pylint.json ${{ steps.files-lammps.outputs.files }} || true
-          pylint --rcfile=.pylintrc --output-format=text ${{ steps.files-lammps.outputs.files }} > lint-reports-lammps/pylint.txt 2>&1 || true
-
-      - name: Upload lammps lint reports
-        if: always() && env.INSTALL_LAMMPS_DEPS == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-reports-lammps
-          path: lint-reports-lammps/
-          retention-days: 30
-      # PR comment step removed for simplicity; reports are uploaded as artifacts instead.

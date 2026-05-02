@@ -5,6 +5,8 @@ extension-pkg-allow-list=
 
 [MESSAGES CONTROL]
 # Disable checks that are noisy or less critical for a research/ML project
+# List of module names for which member attributes should not be checked
+ignored-modules=mlflow,cv2
 disable=
     missing-module-docstring,
     missing-class-docstring,
@@ -54,7 +56,7 @@ logging-format-style=new
 [BASIC]
 good-names=
     i,j,k,x,y,z,
-    f,e,ax,
+    e,ax,
     _,df,np,pd,plt,
     cv2,lr,
     x0,y0,x1,y1,x2,y2,

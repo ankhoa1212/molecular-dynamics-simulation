@@ -30,8 +30,8 @@ def run_simulation(cmd, filename, output_dir):
 def _parse_json_config(config_file):
     """Parses a JSON configuration file."""
     config_args = []
-    with open(config_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    with open(config_file, "r", encoding="utf-8") as cfg_file:
+        data = json.load(cfg_file)
         if isinstance(data, list):
             config_args = [str(x) for x in data]
         elif isinstance(data, dict):
@@ -66,9 +66,9 @@ def _parse_json_config(config_file):
 def _parse_text_config(config_file):
     """Parses a text configuration file."""
     config_args = []
-    with open(config_file, "r", encoding="utf-8") as f:
+    with open(config_file, "r", encoding="utf-8") as cfg_file:
         # Read content, ignore comments, split by whitespace
-        for line in f:
+        for line in cfg_file:
             line = line.split("#", 1)[0].strip()
             if line:
                 config_args.extend(line.split())
@@ -224,7 +224,7 @@ def generate_commands(config, args, lammps_executable):
     os.makedirs(log_dir, exist_ok=True)
 
     # Clear commands.txt
-    with open("commands.txt", "w", encoding="utf-8") as f:
+    with open("commands.txt", "w", encoding="utf-8") as cmd_file:
         pass
 
     current_molecules = config["m_start"]
@@ -260,8 +260,8 @@ def generate_commands(config, args, lammps_executable):
             )
             commands.append((cmd, filename))
 
-            with open("commands.txt", "a", encoding="utf-8") as f:
-                f.write(cmd + "\n")
+            with open("commands.txt", "a", encoding="utf-8") as cmd_file:
+                cmd_file.write(cmd + "\n")
 
             current_epsilon += config["e_step"]
 

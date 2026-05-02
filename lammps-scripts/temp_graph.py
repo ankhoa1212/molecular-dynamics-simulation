@@ -43,8 +43,8 @@ def plot_log_temperature(filename, output_dir=None, no_show=False):
     reading_data = False
 
     try:
-        with open(filename, "r", encoding="utf-8") as f:
-            for line in f:
+        with open(filename, "r", encoding="utf-8") as log_file:
+            for line in log_file:
                 # Detect the start of the data table in log.lammps
                 if "Step" in line and "Temp" in line:
                     reading_data = True
@@ -111,13 +111,13 @@ def _compute_radial_projection(x, y, vx, vy):
     """Computes radial velocity and tangential squared velocity."""
     center_x = 100.0
     center_y = 100.0
-    dx = x - center_x
-    dy = y - center_y
-    dist = np.sqrt(dx ** 2 + dy ** 2)
+    delta_x = x - center_x
+    delta_y = y - center_y
+    dist = np.sqrt(delta_x ** 2 + delta_y ** 2)
 
     with np.errstate(divide="ignore", invalid="ignore"):
-        unit_radial_x = np.divide(dx, dist, out=np.zeros_like(dx), where=dist != 0)
-        unit_radial_y = np.divide(dy, dist, out=np.zeros_like(dy), where=dist != 0)
+        unit_radial_x = np.divide(delta_x, dist, out=np.zeros_like(delta_x), where=dist != 0)
+        unit_radial_y = np.divide(delta_y, dist, out=np.zeros_like(delta_y), where=dist != 0)
 
     v_rad = vx * unit_radial_x + vy * unit_radial_y
     vel_sq = vx ** 2 + vy ** 2
@@ -125,7 +125,7 @@ def _compute_radial_projection(x, y, vx, vy):
     return v_rad, vel_sq, vel_tan_sq
 
 
-def _compute_frame_temperature(x, y, vx, vy, n_atoms):
+def _compute_frame_temperature(x, y, vx, vy, num_atoms):
     """
     Computes standard and drift-corrected temperatures for a single frame.
     """
@@ -134,7 +134,7 @@ def _compute_frame_temperature(x, y, vx, vy, n_atoms):
     # --- 2. Calculate "Standard" Total Temperature ---
     # Raw KE = 0.5 * m * (vx^2 + vy^2)
     # T = Sum(v^2) / (2 * N)  [2 Degrees of Freedom]
-    total_temp = np.sum(vel_sq) / (2.0 * n_atoms)
+    total_temp = np.sum(vel_sq) / (2.0 * num_atoms)
 
     # --- 3. Calculate Drift-Corrected Temperature ---
     # Calculate the Mean Radial Velocity (The "Bulk Implosion Speed")
@@ -145,7 +145,7 @@ def _compute_frame_temperature(x, y, vx, vy, n_atoms):
 
     # Re-calculate Total Kinetic Energy using the FLUCTUATIONS only
     corrected_sq_sum = np.sum(vel_tan_sq + v_rad_fluctuation ** 2)
-    corrected_temp = corrected_sq_sum / (2.0 * n_atoms)
+    corrected_temp = corrected_sq_sum / (2.0 * num_atoms)
 
     return total_temp, corrected_temp
 
@@ -153,7 +153,7 @@ def _compute_frame_temperature(x, y, vx, vy, n_atoms):
 def _calculate_temps_for_frame(frame):
     """calculates temperature for a single frame"""
     x, y, vx, vy = _process_atom_lines(frame["atoms"])
-    return _compute_frame_temperature(x, y, vx, vy, frame["n_atoms"])
+    return _compute_frame_temperature(x, y, vx, vy, frame["num_atoms"])
 
 
 def plot_temperatures(filename, output_dir=None, no_show=False):
@@ -168,7 +168,7 @@ def plot_temperatures(filename, output_dir=None, no_show=False):
 
     try:
         for frame in parse_lammps_dump(filename):
-            if frame["n_atoms"] == 0:
+            if frame["num_atoms"] == 0:
                 continue
 
             total_temp, corrected_temp = _calculate_temps_for_frame(frame)

@@ -97,8 +97,8 @@ def main():
             sys.exit(0)
 
         print(f"Found {len(files)} files processing...")
-        for f in files:
-            process_file(f, output_dir, no_show)
+        for file_path in files:
+            process_file(file_path, output_dir, no_show)
 
     else:
         print(f"Error: {input_path} does not exist.")

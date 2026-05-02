@@ -289,14 +289,19 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         )
         self._update_status()
 
-    def _find_crop_at(self, canvas_x: float, canvas_y: float) -> tuple[Optional[str], Optional[int]]:
+    def _find_crop_at(
+        self, canvas_x: float, canvas_y: float
+    ) -> tuple[Optional[str], Optional[int]]:
         """Return (type, index) of the topmost annotation whose canvas rect contains (canvas_x, canvas_y)."""
         # Check manual annotations first (they are on top)
         for i in range(len(self._manual_annots) - 1, -1, -1):
             x1, y1, x2, y2, _ = self._manual_annots[i]
             rect_canvas_x1, rect_canvas_y1 = self._image_to_canvas(x1, y1)
             rect_canvas_x2, rect_canvas_y2 = self._image_to_canvas(x2, y2)
-            if rect_canvas_x1 <= canvas_x <= rect_canvas_x2 and rect_canvas_y1 <= canvas_y <= rect_canvas_y2:
+            if (
+                rect_canvas_x1 <= canvas_x <= rect_canvas_x2
+                and rect_canvas_y1 <= canvas_y <= rect_canvas_y2
+            ):
                 return "manual", i
 
         # Check YOLO reference labels
@@ -304,7 +309,10 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             x1, y1, x2, y2, _ = self._yolo_labels[i]
             rect_canvas_x1, rect_canvas_y1 = self._image_to_canvas(x1, y1)
             rect_canvas_x2, rect_canvas_y2 = self._image_to_canvas(x2, y2)
-            if rect_canvas_x1 <= canvas_x <= rect_canvas_x2 and rect_canvas_y1 <= canvas_y <= rect_canvas_y2:
+            if (
+                rect_canvas_x1 <= canvas_x <= rect_canvas_x2
+                and rect_canvas_y1 <= canvas_y <= rect_canvas_y2
+            ):
                 return "yolo", i
 
         return None, None
@@ -314,7 +322,12 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         x1, y1, x2, y2, _ = self._manual_annots[idx]
         rect_canvas_x1, rect_canvas_y1 = self._image_to_canvas(x1, y1)
         rect_canvas_x2, rect_canvas_y2 = self._image_to_canvas(x2, y2)
-        handles = [("nw", rect_canvas_x1, rect_canvas_y1), ("ne", rect_canvas_x2, rect_canvas_y1), ("sw", rect_canvas_x1, rect_canvas_y2), ("se", rect_canvas_x2, rect_canvas_y2)]
+        handles = [
+            ("nw", rect_canvas_x1, rect_canvas_y1),
+            ("ne", rect_canvas_x2, rect_canvas_y1),
+            ("sw", rect_canvas_x1, rect_canvas_y2),
+            ("se", rect_canvas_x2, rect_canvas_y2),
+        ]
         for name, handle_x, handle_y in handles:
             if abs(canvas_x - handle_x) <= HANDLE_HIT and abs(canvas_y - handle_y) <= HANDLE_HIT:
                 return name
@@ -346,7 +359,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                 else:
                     self._btn_convert.config(state=tk.DISABLED)
 
-                handle = self._get_handle_at(cx, cy, idx)
+                handle = self._get_handle_at(canvas_x, canvas_y, idx)
                 self._edit_drag_mode = f"resize_{handle}" if handle else "move"
                 self._edit_drag_start_canvas = (event.x, event.y)
                 x1, y1, x2, y2, _ = self._manual_annots[idx]
@@ -499,9 +512,9 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
 
                     _, ext = os.path.splitext(name)
                     if ext.lower() in IMAGE_EXTS:
-                        p = folder / name
-                        if p.is_file():
-                            paths.append(p)
+                        img_path = folder / name
+                        if img_path.is_file():
+                            paths.append(img_path)
             except Exception as e:  # pylint: disable=broad-except
                 self.root.after(0, lambda: _finish_scan(None, e))
                 return
@@ -539,9 +552,9 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
     def _ensure_crops_dir(self) -> Optional[Path]:
         if self.folder is None:
             return None
-        d = self.folder / CROPS_SUBDIR
-        d.mkdir(exist_ok=True)
-        return d
+        crops_directory = self.folder / CROPS_SUBDIR
+        crops_directory.mkdir(exist_ok=True)
+        return crops_directory
 
     @property
     def labels_dir(self) -> Optional[Path]:
@@ -557,15 +570,15 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
     def _ensure_labels_dir(self) -> Optional[Path]:
         if self.folder is None:
             return None
-        d = self.labels_dir
-        if d is None or not d.exists():
+        labels_directory = self.labels_dir
+        if labels_directory is None or not labels_directory.exists():
             # If folder is called 'images', create 'labels' next to it
             if self.folder.name == "images":
-                d = self.folder.parent / "labels"
+                labels_directory = self.folder.parent / "labels"
             else:
-                d = self.folder / "labels"
-            d.mkdir(parents=True, exist_ok=True)
-        return d
+                labels_directory = self.folder / "labels"
+            labels_directory.mkdir(parents=True, exist_ok=True)
+        return labels_directory
 
     def prev_image(self) -> None:
         """Navigate to the previous image in the directory."""
@@ -676,10 +689,10 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         self._fit_to_canvas()
 
         # Update toolbar
-        n = len(self.image_paths)
-        self._lbl_counter.config(text=f"{index + 1} / {n}")
+        total_images = len(self.image_paths)
+        self._lbl_counter.config(text=f"{index + 1} / {total_images}")
         self._btn_prev.config(state=tk.NORMAL if index > 0 else tk.DISABLED)
-        self._btn_next.config(state=tk.NORMAL if index < n - 1 else tk.DISABLED)
+        self._btn_next.config(state=tk.NORMAL if index < total_images - 1 else tk.DISABLED)
         self.root.title(f"Crop Tool — {path.name}")
 
         self._update_status()
@@ -716,7 +729,10 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
 
     def _image_to_canvas(self, img_x: float, img_y: float) -> tuple[float, float]:
         display_scale = self.display_scale
-        return (img_x * display_scale + self.img_offset_x + self.pan_x, img_y * display_scale + self.img_offset_y + self.pan_y)
+        return (
+            img_x * display_scale + self.img_offset_x + self.pan_x,
+            img_y * display_scale + self.img_offset_y + self.pan_y,
+        )
 
     def _clamp_to_image(self, img_x: float, img_y: float) -> tuple[int, int]:
         if self.pil_image is None:
@@ -759,7 +775,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         origin_x_end = max(0, min(img_width, origin_x_end))
         origin_y_end = max(0, min(img_height, origin_y_end))
 
-        if o_x_end <= o_x_start or o_y_end <= o_y_start:
+        if origin_x_end <= origin_x_start or origin_y_end <= origin_y_start:
             self._draw_crop_overlays()
             return
 
@@ -791,13 +807,13 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             color = "#FFD700" if selected else "#00FF88"
             self.canvas.create_rectangle(cx1, cy1, cx2, cy2, outline=color, width=2, tags="overlay")
             if selected:
-                for hx, hy in ((cx1, cy1), (cx2, cy1), (cx1, cy2), (cx2, cy2)):
-                    r = HANDLE_RADIUS
+                for handle_x, handle_y in ((cx1, cy1), (cx2, cy1), (cx1, cy2), (cx2, cy2)):
+                    radius = HANDLE_RADIUS
                     self.canvas.create_rectangle(
-                        hx - r,
-                        hy - r,
-                        hx + r,
-                        hy + r,
+                        handle_x - radius,
+                        handle_y - radius,
+                        handle_x + radius,
+                        handle_y + radius,
                         fill="#FFD700",
                         outline="#FF8C00",
                         width=1,
@@ -825,13 +841,13 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                     tags="overlay",
                 )
             else:  # point mode
-                mid_x, mid_y = (canvas_x1 + canvas_x2) / 2, (canvas_y1 + canvas_y2) / 2
-                r = 4 if selected else 3
+                mid_x, mid_y = (cx1 + cx2) / 2, (cy1 + cy2) / 2
+                radius = 4 if selected else 3
                 self.canvas.create_oval(
-                    mid_x - r,
-                    mid_y - r,
-                    mid_x + r,
-                    mid_y + r,
+                    mid_x - radius,
+                    mid_y - radius,
+                    mid_x + radius,
+                    mid_y + radius,
                     fill=tag_color,
                     outline="white",
                     width=1,
@@ -900,15 +916,15 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
     def _on_pan_drag(self, event: tk.Event) -> None:
         if self._pan_start_canvas is None:
             return
-        dx = event.x - self._pan_start_canvas[0]
-        dy = event.y - self._pan_start_canvas[1]
+        delta_x = event.x - self._pan_start_canvas[0]
+        delta_y = event.y - self._pan_start_canvas[1]
 
         # Real-time shift of all canvas items (don't redraw yet)
-        shift_x = dx - (self.pan_x - self._pan_start_offset[0])
-        shift_y = dy - (self.pan_y - self._pan_start_offset[1])
+        shift_x = delta_x - (self.pan_x - self._pan_start_offset[0])
+        shift_y = delta_y - (self.pan_y - self._pan_start_offset[1])
 
-        self.pan_x = self._pan_start_offset[0] + dx
-        self.pan_y = self._pan_start_offset[1] + dy
+        self.pan_x = self._pan_start_offset[0] + delta_x
+        self.pan_y = self._pan_start_offset[1] + delta_y
 
         self.canvas.move("all", shift_x, shift_y)
 
@@ -958,7 +974,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             self._rect_id = None
 
         # Convert canvas corners → image coordinates
-        img_x0, img_y0 = self._canvas_to_image(canvas_x0_coord, canvas_y0_coord)
+        img_x0, img_y0 = self._canvas_to_image(x0c, y0c)
         img_x1, img_y1 = self._canvas_to_image(event.x, event.y)
 
         # Clamp to image bounds and normalize (ensure top-left < bottom-right)
@@ -1016,20 +1032,20 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         if not lbl_path.exists():
             return
 
-        iw, ih = self.pil_image.size
+        img_width, img_height = self.pil_image.size
         try:
-            with open(lbl_path, "r", encoding="utf-8") as f:
-                for line in f:
+            with open(lbl_path, "r", encoding="utf-8") as label_file:
+                for line in label_file:
                     parts = line.strip().split()
                     if len(parts) < 5:
                         continue
                     _cls_id = int(parts[0])
-                    xc, yc, w, h = map(float, parts[1:5])
+                    x_center, y_center, width, height = map(float, parts[1:5])
 
-                    px_w, px_h = w * iw, h * ih
-                    px_xc, px_yc = xc * iw, yc * ih
-                    x1, y1 = int(px_xc - px_w / 2), int(px_yc - px_h / 2)
-                    x2, y2 = int(px_xc + px_w / 2), int(px_yc + px_h / 2)
+                    px_width, px_height = width * img_width, height * img_height
+                    px_x_center, px_y_center = x_center * img_width, y_center * img_height
+                    x1, y1 = int(px_x_center - px_width / 2), int(px_y_center - px_height / 2)
+                    x2, y2 = int(px_x_center + px_width / 2), int(px_y_center + px_height / 2)
 
                     # Try to find a matching PNG crop
                     match_path = None
@@ -1071,26 +1087,26 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         if not lbl_path.exists():
             return
 
-        iw, ih = self.pil_image.size
+        img_width, img_height = self.pil_image.size
         try:
-            with open(lbl_path, "r", encoding="utf-8") as f:
-                for line in f:
+            with open(lbl_path, "r", encoding="utf-8") as label_file:
+                for line in label_file:
                     parts = line.strip().split()
                     if len(parts) < 5:
                         continue
                     cls_id = int(parts[0])
-                    xc, yc, w, h = map(float, parts[1:5])
+                    x_center, y_center, width, height = map(float, parts[1:5])
 
                     # Convert normalized to pixel coordinates
-                    px_w = w * iw
-                    px_h = h * ih
-                    px_xc = xc * iw
-                    px_yc = yc * ih
+                    px_width = width * img_width
+                    px_height = height * img_height
+                    px_x_center = x_center * img_width
+                    px_y_center = y_center * img_height
 
-                    x1 = int(px_xc - px_w / 2)
-                    y1 = int(px_yc - px_h / 2)
-                    x2 = int(px_xc + px_w / 2)
-                    y2 = int(px_yc + px_h / 2)
+                    x1 = int(px_x_center - px_width / 2)
+                    y1 = int(px_y_center - px_height / 2)
+                    x2 = int(px_x_center + px_width / 2)
+                    y2 = int(px_y_center + px_height / 2)
 
                     self._yolo_labels.append((x1, y1, x2, y2, cls_id))
         except Exception as e:  # pylint: disable=broad-except
@@ -1141,21 +1157,21 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                 lbl_path.unlink()
             return
 
-        iw, ih = self.pil_image.size
+        img_width, img_height = self.pil_image.size
         try:
-            with open(lbl_path, "w", encoding="utf-8") as f:
+            with open(lbl_path, "w", encoding="utf-8") as label_file:
                 for x1, y1, x2, y2, _ in self._manual_annots:
                     # YOLO format: class x_center y_center width height (normalized)
-                    w = x2 - x1
-                    h = y2 - y1
-                    xc = x1 + w / 2
-                    yc = y1 + h / 2
+                    width = x2 - x1
+                    height = y2 - y1
+                    x_center = x1 + width / 2
+                    y_center = y1 + height / 2
 
-                    n_xc = xc / iw
-                    n_yc = yc / ih
-                    n_w = w / iw
-                    n_h = h / ih
-                    f.write(f"0 {n_xc:.6f} {n_yc:.6f} {n_w:.6f} {n_h:.6f}\n")
+                    n_xc = x_center / img_width
+                    n_yc = y_center / img_height
+                    n_w = width / img_width
+                    n_h = height / img_height
+                    label_file.write(f"0 {n_xc:.6f} {n_yc:.6f} {n_w:.6f} {n_h:.6f}\n")
         except Exception as e:  # pylint: disable=broad-except
             self._status.set(f"YOLO sync failed: {e}")
 
@@ -1285,7 +1301,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             self._status.set("Open a folder to begin.")
             return
         name = self.image_paths[self.current_index].name
-        iw, ih = self.pil_image.size
+        img_width, img_height = self.pil_image.size
         zoom_pct = int(self.display_scale * 100)
         m_count = len(self._manual_annots)
         y_count = len(self._yolo_labels)
@@ -1293,7 +1309,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         crops_gen = "Crops:ON" if self._save_crops_mode else "Crops:OFF"
 
         self._status.set(
-            f"{name} ({iw}x{ih}) | Zoom:{zoom_pct}% | {mode} | "
+            f"{name} ({img_width}x{img_height}) | Zoom:{zoom_pct}% | {mode} | "
             f"{crops_gen} | {m_count} labels | {y_count} ref"
         )
 

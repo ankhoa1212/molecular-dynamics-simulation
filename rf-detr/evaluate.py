@@ -14,8 +14,8 @@ from mlflow_utils import end_run, start_run
 
 
 def load_config(path: str) -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f)
+    with open(path) as config_file:
+        return yaml.safe_load(config_file)
 
 
 def resolve_checkpoint(config: dict, run_id: str | None) -> Path:
@@ -23,7 +23,7 @@ def resolve_checkpoint(config: dict, run_id: str | None) -> Path:
     if run_id:
         client = mlflow.tracking.MlflowClient()
         artifacts = client.list_artifacts(run_id)
-        pth_artifacts = [a for a in artifacts if a.path.endswith(".pth")]
+        pth_artifacts = [artifact for artifact in artifacts if artifact.path.endswith(".pth")]
         if pth_artifacts:
             local_path = client.download_artifacts(run_id, pth_artifacts[0].path)
             return Path(local_path)
@@ -70,8 +70,8 @@ def main() -> None:
     checkpoint = resolve_checkpoint(config, args.run_id)
     model = load_model(model_cfg["variant"].lower(), checkpoint)
 
-    with open(splits.test_dir / "_annotations.coco.json") as f:
-        coco = json.load(f)
+    with open(splits.test_dir / "_annotations.coco.json") as annotation_file:
+        coco = json.load(annotation_file)
 
     image_id_to_anns: dict[int, list] = {}
     for ann in coco["annotations"]:
@@ -90,10 +90,10 @@ def main() -> None:
         annotations = image_id_to_anns.get(image_info["id"], [])
         if annotations:
             # COCO bbox is [x, y, w, h]; convert to xyxy
-            boxes = np.array([a["bbox"] for a in annotations], dtype=np.float32)
+            boxes = np.array([annotation["bbox"] for annotation in annotations], dtype=np.float32)
             boxes[:, 2] += boxes[:, 0]
             boxes[:, 3] += boxes[:, 1]
-            class_ids = np.array([a["category_id"] - 1 for a in annotations])
+            class_ids = np.array([annotation["category_id"] - 1 for annotation in annotations])
             ground_truth = sv.Detections(xyxy=boxes, class_id=class_ids)
         else:
             ground_truth = sv.Detections.empty()
@@ -131,8 +131,8 @@ def main() -> None:
     }
 
     print("\n=== Evaluation Results ===")
-    for k, v in metrics.items():
-        print(f"  {k}: {v:.4f}")
+    for metric_name, metric_value in metrics.items():
+        print(f"  {metric_name}: {metric_value:.4f}")
 
     if args.run_id:
         with mlflow.start_run(run_id=args.run_id):

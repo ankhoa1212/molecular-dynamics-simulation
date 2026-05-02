@@ -8,8 +8,8 @@ from mlflow_utils import end_run, log_artifact, log_epoch_metrics, start_run
 
 
 def load_config(path: str) -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f)
+    with open(path) as config_file:
+        return yaml.safe_load(config_file)
 
 
 def flatten_config(config: dict, prefix: str = "") -> dict[str, str]:
@@ -19,7 +19,7 @@ def flatten_config(config: dict, prefix: str = "") -> dict[str, str]:
         if isinstance(value, dict):
             flat.update(flatten_config(value, prefix=f"{full_key}."))
         elif isinstance(value, list):
-            flat[full_key] = ",".join(str(v) for v in value)
+            flat[full_key] = ",".join(str(item) for item in value)
         else:
             flat[full_key] = str(value)
     return flat
@@ -58,7 +58,11 @@ def main() -> None:
 
     @callbacks.register("on_fit_epoch_end")
     def _log_metrics(trainer) -> None:
-        metrics = {k: float(v) for k, v in trainer.metrics.items() if isinstance(v, (int, float))}
+        metrics = {
+            key: float(value)
+            for key, value in trainer.metrics.items()
+            if isinstance(value, (int, float))
+        }
         log_epoch_metrics(metrics, step=trainer.epoch)
 
     variant = model_cfg["variant"].lower()

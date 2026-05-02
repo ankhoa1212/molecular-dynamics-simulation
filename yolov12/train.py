@@ -16,9 +16,9 @@ def main():
     if not os.path.exists(data_yaml):
         raise FileNotFoundError(f"Dataset YAML file not found: {data_yaml}")
     else:
-        with open(data_yaml, "r") as f:
+        with open(data_yaml, "r") as yaml_file:
             print(f"Found dataset YAML file at {data_yaml}:\n")
-            print(f.read())
+            print(yaml_file.read())
 
     try:
         # Train the model

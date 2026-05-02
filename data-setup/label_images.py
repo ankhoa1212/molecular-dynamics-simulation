@@ -132,8 +132,8 @@ def _load_model(args):
     """Load the saved LodeSTAR model, reading architecture from companion JSON."""
     config_path = os.path.splitext(args.model_path)[0] + ".json"
     if os.path.exists(config_path):
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
+        with open(config_path, "r", encoding="utf-8") as config_file:
+            config = json.load(config_file)
         n_transforms = config.get("n_transforms", 8)
         num_outputs = config.get("num_outputs", 3)
         args.num_outputs = num_outputs
@@ -398,7 +398,7 @@ def main():
     min_box_px = args.min_box_size if args.min_box_size > 0 else float(args.box_size)
     cfg = _SaveConfig(
         output_dir=args.output_dir,
-        frame_shape=(data.shape[1], data.shape[2]),
+        frame_shape=(data.shape[1], data.shape[2]),  # pylint: disable=unsubscriptable-object
         use_radius=args.use_radius,
         radius_scale=args.radius_scale,
         min_box_px=min_box_px,

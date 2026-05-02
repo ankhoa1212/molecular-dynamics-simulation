@@ -216,19 +216,19 @@ def _process_single_png(idx, png_path, img_dir, lbl_dir, ctx):
     _write_frame(lbl_path, frame_norm, frame_dets, cfg)
 
 
-def _process_single_tif_frame(i, tiff_stack, img_dir, lbl_dir, ctx):
+def _process_single_tif_frame(frame_index, tiff_stack, img_dir, lbl_dir, ctx):
     """Normalize, save, and label one frame from a TIFF stack.
 
     Skips the frame if the label already exists or detection yields NaN/Inf.
     """
-    lbl_path = os.path.join(lbl_dir, f"frame_{i:05d}.txt")
+    lbl_path = os.path.join(lbl_dir, f"frame_{frame_index:05d}.txt")
     if os.path.exists(lbl_path):
         return
-    frame_norm = _normalize_frame(tiff_stack[i])
-    _save_image(os.path.join(img_dir, f"frame_{i:05d}.png"), frame_norm)
+    frame_norm = _normalize_frame(tiff_stack[frame_index])
+    _save_image(os.path.join(img_dir, f"frame_{frame_index:05d}.png"), frame_norm)
     frame_dets = _detect_frame(frame_norm, ctx)
     if frame_dets is None:
-        print(f"Warning: skipping frame {i} (NaN/Inf or empty).")
+        print(f"Warning: skipping frame {frame_index} (NaN/Inf or empty).")
         return
     cfg = _make_cfg(ctx, lbl_dir, frame_norm.shape[:2])
     _write_frame(lbl_path, frame_norm, frame_dets, cfg)
@@ -259,8 +259,8 @@ def extract_and_labels(tif_path, model, args):
 
     # Inline range into the loop to avoid an extra local variable
     print(f"Processing {tif_path}: {len(range(0, len(tiff_stack), args.nth))} frames...")
-    for i in tqdm(range(0, len(tiff_stack), args.nth), desc=f"Frames from {base_name}"):
-        _process_single_tif_frame(i, tiff_stack, img_dir, lbl_dir, ctx)
+    for frame_index in tqdm(range(0, len(tiff_stack), args.nth), desc=f"Frames from {base_name}"):
+        _process_single_tif_frame(frame_index, tiff_stack, img_dir, lbl_dir, ctx)
 
 
 def process_png_frames(png_files, model, args, png_dir):

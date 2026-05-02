@@ -159,15 +159,17 @@ def parse_args():
 
 def _pad_to_square(img: Image.Image, size: int) -> Image.Image:
     """Centre-crop oversized axes then zero-pad to exactly size×size."""
-    w, h = img.size
-    if w > size or h > size:
-        left = max((w - size) // 2, 0)
-        top = max((h - size) // 2, 0)
-        img = img.crop((left, top, left + min(w, size), top + min(h, size)))
-        w, h = img.size
-    pad_l = (size - w) // 2
-    pad_t = (size - h) // 2
-    return ImageOps.expand(img, border=(pad_l, pad_t, size - w - pad_l, size - h - pad_t), fill=0)
+    img_width, img_height = img.size
+    if img_width > size or img_height > size:
+        left = max((img_width - size) // 2, 0)
+        top = max((img_height - size) // 2, 0)
+        img = img.crop((left, top, left + min(img_width, size), top + min(img_height, size)))
+        img_width, img_height = img.size
+    pad_l = (size - img_width) // 2
+    pad_t = (size - img_height) // 2
+    return ImageOps.expand(
+        img, border=(pad_l, pad_t, size - img_width - pad_l, size - img_height - pad_t), fill=0
+    )
 
 
 def _load_crops(image_files, crop_size=64):
@@ -294,10 +296,12 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     elif args.input_file:
         # If specific files are given, use their parent directories as source_dirs
         # for logging purposes in MLflow.
-        source_dirs = list(set(os.path.dirname(os.path.abspath(f)) for f in args.input_file))
-        for f in args.input_file:
-            if os.path.isfile(f) and os.path.splitext(f)[1].lower() in valid_exts:
-                crop_files_set.add(os.path.abspath(f))
+        source_dirs = list(
+            set(os.path.dirname(os.path.abspath(fpath)) for fpath in args.input_file)
+        )
+        for fpath in args.input_file:
+            if os.path.isfile(fpath) and os.path.splitext(fpath)[1].lower() in valid_exts:
+                crop_files_set.add(os.path.abspath(fpath))
 
     if args.input_dir:
         for base_dir in source_dirs:
@@ -310,8 +314,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             ]
             if found_base:
                 print(f"Found {len(found_base)} image(s) in {base_dir}")
-                for f in found_base:
-                    crop_files_set.add(os.path.abspath(f))
+                for fpath in found_base:
+                    crop_files_set.add(os.path.abspath(fpath))
 
             # Also check 'crops' subdirectory
             crops_dir = os.path.join(base_dir, "crops")
@@ -324,8 +328,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 ]
                 if found_crops:
                     print(f"Found {len(found_crops)} image(s) in {crops_dir}")
-                    for f in found_crops:
-                        crop_files_set.add(os.path.abspath(f))
+                    for fpath in found_crops:
+                        crop_files_set.add(os.path.abspath(fpath))
             elif not found_base:
                 print(f"Warning: No images found in {base_dir} or {crops_dir}")
 
@@ -381,8 +385,8 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         # Save companion JSON so label_images.py can reconstruct the architecture
         config = {"n_transforms": args.n_transforms, "num_outputs": args.num_outputs}
         config_path = os.path.splitext(args.model_path)[0] + ".json"
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2)
+        with open(config_path, "w", encoding="utf-8") as config_file:
+            json.dump(config, config_file, indent=2)
         print(f"Config saved to {config_path}")
 
         mlflow.log_artifact(args.model_path)

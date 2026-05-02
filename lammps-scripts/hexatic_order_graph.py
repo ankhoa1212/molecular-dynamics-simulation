@@ -20,12 +20,10 @@ def main():
         "filename",
         nargs="?",
         help="Specific LAMMPS trajectory file to process. "
-             "If not provided, processes all in results/.",
+        "If not provided, processes all in results/.",
     )
     parser.add_argument("--output_dir", default=None, help="Output directory")
-    parser.add_argument(
-        "--no-show", action="store_true", help="Do not display the graph"
-    )
+    parser.add_argument("--no-show", action="store_true", help="Do not display the graph")
     args = parser.parse_args()
 
     if args.filename:
@@ -34,22 +32,22 @@ def main():
         plt.figure(figsize=(10, 6))
         filename = os.path.basename(filepath)
 
-        n_molecules, eps = extract_epsilon_and_molecules(filename)
+        num_molecules, epsilon = extract_epsilon_and_molecules(filename)
 
-        frames, psi6 = parse_and_calc_hexatic(filepath)
+        frames, hexatic_order = parse_and_calc_hexatic(filepath)
 
-        label_str = f"N={n_molecules}, ε={eps}"
-        plt.plot(frames, psi6, label=label_str, alpha=0.7)
+        label_str = f"N={num_molecules}, ε={epsilon}"
+        plt.plot(frames, hexatic_order, label=label_str, alpha=0.7)
 
         plt.xlabel("Frame")
         plt.ylabel(r"Global Hexatic Order $|\Psi_6|$")
-        plt.title(f"Hexatic Order Parameter: N={n_molecules}, ε={eps}")
+        plt.title(f"Hexatic Order Parameter: N={num_molecules}, ε={epsilon}")
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
 
         if "." in filename:
-            base = filename[:filename.rfind(".")]
+            base = filename[: filename.rfind(".")]
         else:
             base = filename
 

@@ -4,18 +4,18 @@ from pathlib import Path
 
 import mlflow
 import numpy as np
-import supervision as sv
-import yaml
 from PIL import Image
+import supervision as sv
 from supervision.metrics import ConfusionMatrix, MeanAveragePrecision
+import yaml
 
 from dataset import split_by_experiment
 from mlflow_utils import end_run, start_run
 
 
 def load_config(path: str) -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f)
+    with open(path) as config_file:
+        return yaml.safe_load(config_file)
 
 
 def resolve_checkpoint(config: dict, run_id: str | None) -> Path:
@@ -23,19 +23,14 @@ def resolve_checkpoint(config: dict, run_id: str | None) -> Path:
     if run_id:
         client = mlflow.tracking.MlflowClient()
         artifacts = client.list_artifacts(run_id)
-        pth_artifacts = [a for a in artifacts if a.path.endswith(".pth")]
+        pth_artifacts = [artifact for artifact in artifacts if artifact.path.endswith(".pth")]
         if pth_artifacts:
             local_path = client.download_artifacts(run_id, pth_artifacts[0].path)
             return Path(local_path)
-    candidates = sorted(
-        checkpoint_dir.glob("*.pth"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
+    candidates = sorted(checkpoint_dir.glob("*.pth"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not candidates:
         raise FileNotFoundError(
-            f"No checkpoint found in {checkpoint_dir}. "
-            "Run training first or pass --run-id."
+            f"No checkpoint found in {checkpoint_dir}. " "Run training first or pass --run-id."
         )
     return candidates[0]
 
@@ -43,9 +38,11 @@ def resolve_checkpoint(config: dict, run_id: str | None) -> Path:
 def load_model(variant: str, checkpoint: Path):
     if variant == "base":
         from rfdetr import RFDETRBase
+
         return RFDETRBase(pretrain_weights=str(checkpoint))
     elif variant == "large":
         from rfdetr import RFDETRLarge
+
         return RFDETRLarge(pretrain_weights=str(checkpoint))
     raise ValueError(f"Unknown model variant {variant!r}. Choose 'base' or 'large'.")
 
@@ -54,9 +51,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate RF-DETR particle detector")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument(
-        "--run-id",
-        default=None,
-        help="MLflow run ID to load checkpoint from and log metrics to",
+        "--run-id", default=None, help="MLflow run ID to load checkpoint from and log metrics to"
     )
     args = parser.parse_args()
 
@@ -75,8 +70,8 @@ def main() -> None:
     checkpoint = resolve_checkpoint(config, args.run_id)
     model = load_model(model_cfg["variant"].lower(), checkpoint)
 
-    with open(splits.test_dir / "_annotations.coco.json") as f:
-        coco = json.load(f)
+    with open(splits.test_dir / "_annotations.coco.json") as annotation_file:
+        coco = json.load(annotation_file)
 
     image_id_to_anns: dict[int, list] = {}
     for ann in coco["annotations"]:
@@ -95,32 +90,38 @@ def main() -> None:
         annotations = image_id_to_anns.get(image_info["id"], [])
         if annotations:
             # COCO bbox is [x, y, w, h]; convert to xyxy
-            boxes = np.array([a["bbox"] for a in annotations], dtype=np.float32)
+            boxes = np.array([annotation["bbox"] for annotation in annotations], dtype=np.float32)
             boxes[:, 2] += boxes[:, 0]
             boxes[:, 3] += boxes[:, 1]
-            class_ids = np.array([a["category_id"] - 1 for a in annotations])
-            gt = sv.Detections(xyxy=boxes, class_id=class_ids)
+            class_ids = np.array([annotation["category_id"] - 1 for annotation in annotations])
+            ground_truth = sv.Detections(xyxy=boxes, class_id=class_ids)
         else:
-            gt = sv.Detections.empty()
-        all_targets.append(gt)
+            ground_truth = sv.Detections.empty()
+        all_targets.append(ground_truth)
 
     map_metric = MeanAveragePrecision()
     map_metric.update(all_predictions, all_targets)
     map_result = map_metric.compute()
 
     confusion = ConfusionMatrix.from_detections(
-        predictions=all_predictions,
-        targets=all_targets,
-        classes=["particle"],
+        predictions=all_predictions, targets=all_targets, classes=["particle"]
     )
     # matrix shape: (num_classes+1, num_classes+1); last index = background
     # matrix[actual][predicted]
     matrix = confusion.matrix
-    tp = float(matrix[0][0])
-    fp = float(matrix[matrix.shape[0] - 1][0])
-    fn = float(matrix[0][matrix.shape[1] - 1])
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    true_positives = float(matrix[0][0])
+    false_positives = float(matrix[matrix.shape[0] - 1][0])
+    false_negatives = float(matrix[0][matrix.shape[1] - 1])
+    precision = (
+        true_positives / (true_positives + false_positives)
+        if (true_positives + false_positives) > 0
+        else 0.0
+    )
+    recall = (
+        true_positives / (true_positives + false_negatives)
+        if (true_positives + false_negatives) > 0
+        else 0.0
+    )
 
     metrics = {
         "test/mAP50": float(map_result.map50),
@@ -130,8 +131,8 @@ def main() -> None:
     }
 
     print("\n=== Evaluation Results ===")
-    for k, v in metrics.items():
-        print(f"  {k}: {v:.4f}")
+    for metric_name, metric_value in metrics.items():
+        print(f"  {metric_name}: {metric_value:.4f}")
 
     if args.run_id:
         with mlflow.start_run(run_id=args.run_id):

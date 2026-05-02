@@ -22,21 +22,10 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Run LodeSTAR inference and write YOLO label files."
     )
+    parser.add_argument("--input-dir", type=str, help="Directory containing input images.")
+    parser.add_argument("--input-file", type=str, help="Path to a single input image.")
     parser.add_argument(
-        "--input-dir",
-        type=str,
-        help="Directory containing input images.",
-    )
-    parser.add_argument(
-        "--input-file",
-        type=str,
-        help="Path to a single input image.",
-    )
-    parser.add_argument(
-        "--model-path",
-        type=str,
-        required=True,
-        help="Path to the saved LodeSTAR .pt weights file.",
+        "--model-path", type=str, required=True, help="Path to the saved LodeSTAR .pt weights file."
     )
     parser.add_argument(
         "--output-dir",
@@ -83,16 +72,10 @@ def parse_args():
         help=("Minimum pixel distance between detections (NMS). " "0 disables NMS."),
     )
     parser.add_argument(
-        "--alpha",
-        type=float,
-        default=0.5,
-        help="Alpha parameter for LodeSTAR detect.",
+        "--alpha", type=float, default=0.5, help="Alpha parameter for LodeSTAR detect."
     )
     parser.add_argument(
-        "--cutoff",
-        type=float,
-        default=0.5,
-        help="Cutoff parameter for LodeSTAR detect.",
+        "--cutoff", type=float, default=0.5, help="Cutoff parameter for LodeSTAR detect."
     )
     parser.add_argument(
         "--detect-mode",
@@ -149,8 +132,8 @@ def _load_model(args):
     """Load the saved LodeSTAR model, reading architecture from companion JSON."""
     config_path = os.path.splitext(args.model_path)[0] + ".json"
     if os.path.exists(config_path):
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
+        with open(config_path, "r", encoding="utf-8") as config_file:
+            config = json.load(config_file)
         n_transforms = config.get("n_transforms", 8)
         num_outputs = config.get("num_outputs", 3)
         args.num_outputs = num_outputs
@@ -165,9 +148,7 @@ def _load_model(args):
         args.num_outputs = num_outputs
 
     lodestar = dl.LodeSTAR(
-        n_transforms=n_transforms,
-        num_outputs=num_outputs,
-        optimizer=dl.Adam(lr=1e-3),
+        n_transforms=n_transforms, num_outputs=num_outputs, optimizer=dl.Adam(lr=1e-3)
     ).build()
     lodestar.load_state_dict(torch.load(args.model_path, map_location="cpu"))
     lodestar.eval()
@@ -208,11 +189,11 @@ def _nms(detections, min_dist):
         if suppressed[idx_i]:
             continue
         keep.append(det_i)
-        yi, xi = arr[idx_i, 0], arr[idx_i, 1]
+        target_y, target_x = arr[idx_i, 0], arr[idx_i, 1]
         for idx_j in range(idx_i + 1, len(arr)):
             if suppressed[idx_j]:
                 continue
-            dist = np.sqrt((arr[idx_j, 0] - yi) ** 2 + (arr[idx_j, 1] - xi) ** 2)
+            dist = np.sqrt((arr[idx_j, 0] - target_y) ** 2 + (arr[idx_j, 1] - target_x) ** 2)
             if dist < min_dist:
                 suppressed[idx_j] = True
     return keep
@@ -234,10 +215,7 @@ def _run_inference(lodestar, data_tensor, args, beta):
 
     all_detections = []
     with torch.inference_mode():
-        for i in tqdm(
-            range(0, len(data_tensor), args.detect_batch_size),
-            desc="Detecting targets",
-        ):
+        for i in tqdm(range(0, len(data_tensor), args.detect_batch_size), desc="Detecting targets"):
             batch = data_tensor[i : i + args.detect_batch_size]
             try:
                 batch_dets = _run_detect(batch, detect_device)
@@ -362,13 +340,10 @@ def _write_frame(frame_file, image, frame_dets, cfg):
 
 def _save_labels_and_plots(image_files, images, all_detections, cfg):
     print("Saving YOLO labels...")
-    for frame_idx, (frame_file, frame_dets) in enumerate(
-        tqdm(
-            zip(image_files, all_detections),
-            total=len(image_files),
-            desc="Processing files",
-        )
-    ):
+    detections_iter = tqdm(
+        zip(image_files, all_detections), total=len(image_files), desc="Processing files"
+    )
+    for frame_idx, (frame_file, frame_dets) in enumerate(detections_iter):
         _write_frame(frame_file, images[frame_idx], frame_dets, cfg)
 
 
@@ -423,7 +398,7 @@ def main():
     min_box_px = args.min_box_size if args.min_box_size > 0 else float(args.box_size)
     cfg = _SaveConfig(
         output_dir=args.output_dir,
-        frame_shape=(data.shape[1], data.shape[2]),
+        frame_shape=(data.shape[1], data.shape[2]),  # pylint: disable=unsubscriptable-object
         use_radius=args.use_radius,
         radius_scale=args.radius_scale,
         min_box_px=min_box_px,

@@ -56,13 +56,13 @@ def parse_and_calc_hexatic(filename, verbose=1):
         positions = _process_atoms(frame["atoms"])
 
         # Calculate Hexatic Order
-        hex_comp = freud.order.Hexatic(k=6)
-        hex_comp.compute(
+        hexatic_order_calculator = freud.order.Hexatic(k=6)
+        hexatic_order_calculator.compute(
             system=(current_box, positions), neighbors={"num_neighbors": 6}
         )
 
         # Magnitude of psi6 for each atom
-        mag_psi6 = np.abs(hex_comp.particle_order)
+        mag_psi6 = np.abs(hexatic_order_calculator.particle_order)
         mean_psi6 = np.mean(mag_psi6)
         psi6_means.append(mean_psi6)
 
@@ -72,10 +72,8 @@ def parse_and_calc_hexatic(filename, verbose=1):
     return steps, psi6_means
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Compute hexatic order from a LAMMPS dump file."
-    )
+def main():
+    parser = argparse.ArgumentParser(description="Compute hexatic order from a LAMMPS dump file.")
     parser.add_argument(
         "filename", nargs="?", default="dump.lammps", help="Path to LAMMPS dump file"
     )
@@ -90,3 +88,7 @@ if __name__ == "__main__":
     plt.title("Hexatic Order over Time")
     plt.grid(True)
     plt.show()
+
+
+if __name__ == "__main__":
+    main()

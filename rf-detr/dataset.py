@@ -24,8 +24,8 @@ def split_by_experiment(
         split_dir = dataset_path / "split"
     split_dir = Path(split_dir)
 
-    with open(dataset_path / "annotations.json") as f:
-        coco = json.load(f)
+    with open(dataset_path / "annotations.json") as annotation_file:
+        coco = json.load(annotation_file)
 
     experiment_map = {
         "train": train_experiments,
@@ -71,8 +71,8 @@ def split_by_experiment(
             "annotations": split_annotations[split_name],
         }
 
-        with open(out_dir / "_annotations.coco.json", "w") as f:
-            json.dump(split_coco, f, indent=2)
+        with open(out_dir / "_annotations.coco.json", "w") as annotation_file:
+            json.dump(split_coco, annotation_file, indent=2)
 
         for image in split_images[split_name]:
             src = (images_dir / image["file_name"]).resolve()
@@ -84,7 +84,5 @@ def split_by_experiment(
         result[split_name] = out_dir
 
     return DatasetSplits(
-        train_dir=result["train"],
-        valid_dir=result["valid"],
-        test_dir=result["test"],
+        train_dir=result["train"], valid_dir=result["valid"], test_dir=result["test"]
     )

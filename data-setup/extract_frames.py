@@ -21,9 +21,7 @@ def convert_jpg_to_frames(input_path, output_folder, image_format="png"):
         for fname in tqdm(jpg_files, desc="Converting JPGs"):
             base = os.path.splitext(fname)[0]
             convert_jpg_to_frames(
-                os.path.join(input_path, fname),
-                output_folder,
-                image_format=image_format,
+                os.path.join(input_path, fname), output_folder, image_format=image_format
             )
         return
 
@@ -54,10 +52,7 @@ def convert_tif_to_frames(input_path, output_folder, image_format="png", nth=10)
             out_subdir = os.path.join(output_folder, f"{base}_frames")
             os.makedirs(out_subdir, exist_ok=True)
             convert_tif_to_frames(
-                os.path.join(input_path, fname),
-                out_subdir,
-                image_format=image_format,
-                nth=nth,
+                os.path.join(input_path, fname), out_subdir, image_format=image_format, nth=nth
             )
         return
 
@@ -89,15 +84,10 @@ def convert_tif_to_frames(input_path, output_folder, image_format="png", nth=10)
             frame = cv2.merge([frame, frame, frame])
 
         # 6. Save Frame
-        cv2.imwrite(
-            os.path.join(output_folder, f"frame_{saved_count:05d}.{image_format}"),
-            frame,
-        )
+        cv2.imwrite(os.path.join(output_folder, f"frame_{saved_count:05d}.{image_format}"), frame)
         saved_count += 1
 
-    print(
-        f"Successfully converted {saved_count} frames (every {nth}th) to {output_folder}"
-    )
+    print(f"Successfully converted {saved_count} frames (every {nth}th) to {output_folder}")
 
 
 INPUT_PATH = (
@@ -107,53 +97,37 @@ INPUT_PATH = (
 )
 
 
-
-
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(
-        description="Convert multi-page TIFF to image frames."
-    )
-    parser.add_argument(
+    PARSER = argparse.ArgumentParser(description="Convert multi-page TIFF to image frames.")
+    PARSER.add_argument(
         "input_path",
         nargs="?",
         default=INPUT_PATH,
         help="Path to input .tif file or a directory containing .tif files",
     )
-    parser.add_argument(
-        "output_dir", nargs="?", default=None, help="Directory to save frames"
+    PARSER.add_argument("output_dir", nargs="?", default=None, help="Directory to save frames")
+    PARSER.add_argument(
+        "--jpg", action="store_true", dest="convert_jpg", help="Convert JPG images instead of TIFF"
     )
-    parser.add_argument(
-        "--jpg",
-        action="store_true",
-        dest="convert_jpg",
-        help="Convert JPG images instead of TIFF",
+    PARSER.add_argument(
+        "-n", "--nth", dest="nth", type=int, default=10, help="Save every nth frame (default: 10)"
     )
-    parser.add_argument(
-        "-n",
-        "--nth",
-        dest="nth",
-        type=int,
-        default=10,
-        help="Save every nth frame (default: 10)",
-    )
-    parser.add_argument(
+    PARSER.add_argument(
         "-f",
         "--format",
         dest="image_format",
         default="png",
         help="Output image format (default: png)",
     )
-    args = parser.parse_args()
+    ARGS = PARSER.parse_args()
 
-    if args.output_dir is None:
-        base_name = os.path.splitext(os.path.basename(args.input_path))[0]
-        args.output_dir = os.path.join(os.getcwd(), f"{base_name}_frames")
-    os.makedirs(args.output_dir, exist_ok=True)
+    if ARGS.output_dir is None:
+        BASE_NAME = os.path.splitext(os.path.basename(ARGS.input_path))[0]
+        ARGS.output_dir = os.path.join(os.getcwd(), f"{BASE_NAME}_frames")
+    os.makedirs(ARGS.output_dir, exist_ok=True)
 
-    if args.convert_jpg:
-        convert_jpg_to_frames(args.input_path, args.output_dir, args.image_format)
+    if ARGS.convert_jpg:
+        convert_jpg_to_frames(ARGS.input_path, ARGS.output_dir, ARGS.image_format)
     else:
-        convert_tif_to_frames(
-            args.input_path, args.output_dir, args.image_format, args.nth
-        )
+        convert_tif_to_frames(ARGS.input_path, ARGS.output_dir, ARGS.image_format, ARGS.nth)

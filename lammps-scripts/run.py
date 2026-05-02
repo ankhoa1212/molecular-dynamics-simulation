@@ -30,8 +30,8 @@ def run_simulation(cmd, filename, output_dir):
 def _parse_json_config(config_file):
     """Parses a JSON configuration file."""
     config_args = []
-    with open(config_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    with open(config_file, "r", encoding="utf-8") as cfg_file:
+        data = json.load(cfg_file)
         if isinstance(data, list):
             config_args = [str(x) for x in data]
         elif isinstance(data, dict):
@@ -57,9 +57,7 @@ def _parse_json_config(config_file):
                 # Determine flag prefix
                 prefix = "-" if len(key) == 1 else "--"
                 # If key doesn't start with -, add prefix
-                arg_name = (
-                    key if key.startswith("-") else f"{prefix}{key}"
-                )
+                arg_name = key if key.startswith("-") else f"{prefix}{key}"
                 config_args.append(arg_name)
                 config_args.append(str(value))
     return config_args
@@ -68,9 +66,9 @@ def _parse_json_config(config_file):
 def _parse_text_config(config_file):
     """Parses a text configuration file."""
     config_args = []
-    with open(config_file, "r", encoding="utf-8") as f:
+    with open(config_file, "r", encoding="utf-8") as cfg_file:
         # Read content, ignore comments, split by whitespace
-        for line in f:
+        for line in cfg_file:
             line = line.split("#", 1)[0].strip()
             if line:
                 config_args.extend(line.split())
@@ -96,11 +94,7 @@ def parse_config(argv_list):
                     config_args = _parse_text_config(config_file)
 
                 # Replace --config and its value with the file arguments
-                args_list = (
-                    args_list[:config_index]
-                    + config_args
-                    + args_list[config_index + 2 :]
-                )
+                args_list = args_list[:config_index] + config_args + args_list[config_index + 2 :]
             else:
                 print("Error: --config requires a file path")
                 sys.exit(1)
@@ -114,9 +108,7 @@ def setup_arg_parser():
     """Sets up the argument parser."""
     parser = argparse.ArgumentParser(description="Run LAMMPS simulation.")
 
-    parser.add_argument(
-        "--config", help="Path to file containing arguments", required=False
-    )
+    parser.add_argument("--config", help="Path to file containing arguments", required=False)
     parser.add_argument("input_file", help="LAMMPS input file")
     parser.add_argument("output_dir", nargs="?", help="Output directory")
     parser.add_argument("molecules", nargs="?", help="Start molecules")
@@ -147,11 +139,9 @@ def setup_arg_parser():
         dest="vel_force_scale",
         default=None,
         help="Scaling factor for initial velocity or continuous "
-             "force (default: 9 for velocity_initialization.in, 1.0 for continuous_force.in)",
+        "force (default: 9 for velocity_initialization.in, 1.0 for continuous_force.in)",
     )
-    parser.add_argument(
-        "--steps", default="10000", help="Simulation steps (default: 10000)"
-    )
+    parser.add_argument("--steps", default="10000", help="Simulation steps (default: 10000)")
     return parser
 
 
@@ -189,9 +179,7 @@ def resolve_arguments(args):
     if args.molecules is not None:
         config["m_start"] = int(args.molecules)
         config["m_end"] = (
-            int(args.molecules_end)
-            if args.molecules_end is not None
-            else config["m_start"]
+            int(args.molecules_end) if args.molecules_end is not None else config["m_start"]
         )
         step = args.molecules_step if args.molecules_step is not None else "1"
         config["m_step"] = int(step)
@@ -199,9 +187,7 @@ def resolve_arguments(args):
     if args.var_epsilon is not None:
         config["e_start"] = float(args.var_epsilon)
         config["e_end"] = (
-            float(args.var_epsilon_end)
-            if args.var_epsilon_end is not None
-            else config["e_start"]
+            float(args.var_epsilon_end) if args.var_epsilon_end is not None else config["e_start"]
         )
         step = args.var_epsilon_step if args.var_epsilon_step is not None else "1"
         config["e_step"] = float(step)
@@ -238,39 +224,35 @@ def generate_commands(config, args, lammps_executable):
     os.makedirs(log_dir, exist_ok=True)
 
     # Clear commands.txt
-    with open("commands.txt", "w", encoding="utf-8") as f:
+    with open("commands.txt", "w", encoding="utf-8") as cmd_file:
         pass
 
-    m = config["m_start"]
+    current_molecules = config["m_start"]
 
     while True:  # Molecules loop
         # Check condition
         if config["m_step"] > 0:
-            if m > config["m_end"]:
+            if current_molecules > config["m_end"]:
                 break
         else:
-            if m < config["m_end"]:
+            if current_molecules < config["m_end"]:
                 break
 
-        e = config["e_start"]
+        current_epsilon = config["e_start"]
 
-        while check_epsilon_loop(e, config["e_end"], config["e_step"]):
-            epsilon_val = f"{e:.1f}"
-            filename = f"{base_script_name}_{m}_{epsilon_val}"
+        while check_epsilon_loop(current_epsilon, config["e_end"], config["e_step"]):
+            epsilon_str = f"{current_epsilon:.1f}"
+            filename = f"{base_script_name}_{current_molecules}_{epsilon_str}"
             log_file = os.path.join(log_dir, f"{filename}.log")
 
-            current_tstart = (
-                epsilon_val if args.var_tstart == "epsilon" else args.var_tstart
-            )
-            current_tstop = (
-                epsilon_val if args.var_tstop == "epsilon" else args.var_tstop
-            )
+            current_tstart = epsilon_str if args.var_tstart == "epsilon" else args.var_tstart
+            current_tstop = epsilon_str if args.var_tstop == "epsilon" else args.var_tstop
 
             cmd = (
                 f'"{lammps_executable}" -in "{config["input_script"]}" '
                 f'-log "{log_file}" '
-                f'-var filename "{filename}" -var molecules "{m}" '
-                f'-var var_epsilon "{epsilon_val}" '
+                f'-var filename "{filename}" -var molecules "{current_molecules}" '
+                f'-var var_epsilon "{epsilon_str}" '
                 f'-var var_tstart "{current_tstart}" '
                 f'-var var_tstop "{current_tstop}" '
                 f'-var steps "{args.steps}" '
@@ -278,12 +260,12 @@ def generate_commands(config, args, lammps_executable):
             )
             commands.append((cmd, filename))
 
-            with open("commands.txt", "a", encoding="utf-8") as f:
-                f.write(cmd + "\n")
+            with open("commands.txt", "a", encoding="utf-8") as cmd_file:
+                cmd_file.write(cmd + "\n")
 
-            e += config["e_step"]
+            current_epsilon += config["e_step"]
 
-        m += config["m_step"]
+        current_molecules += config["m_step"]
 
     return commands, base_script_name, log_dir
 
@@ -303,8 +285,7 @@ def run_parallel_tasks(commands, output_dir, max_workers):
     print(f"Running simulations in parallel with up to {max_workers} jobs...")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
-            executor.submit(run_simulation, cmd, filename, output_dir)
-            for cmd, filename in commands
+            executor.submit(run_simulation, cmd, filename, output_dir) for cmd, filename in commands
         ]
         for future in futures:
             future.result()  # Wait for all to complete
@@ -366,9 +347,7 @@ def main():
     print(f"  Output dir: {config['output_dir']}")
     print("=" * 100)
 
-    commands, base_script_name, log_dir = generate_commands(
-        config, args, lammps_executable
-    )
+    commands, base_script_name, log_dir = generate_commands(config, args, lammps_executable)
     print(f"  Log dir:    {log_dir}")
     print("=" * 100)
 
@@ -383,7 +362,6 @@ def main():
     print(f"Check the log directory '{log_dir}' for details.")
 
     print_visualization_commands(config, base_script_name)
-
 
 
 if __name__ == "__main__":

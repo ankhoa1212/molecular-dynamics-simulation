@@ -6,15 +6,15 @@ import logging
 import os
 import random
 
-import mlflow
 import numpy as np
 import torch
 from PIL import Image, ImageOps
-from pytorch_lightning.loggers import MLFlowLogger
 from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.loggers import MLFlowLogger
 
 import deeplay as dl
 import deeptrack as dt
+import mlflow
 
 logging.getLogger("pint").setLevel(logging.ERROR)
 
@@ -69,16 +69,10 @@ def parse_args():
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "--input-dir",
-        type=str,
-        nargs="+",
-        help="One or more directories containing input images.",
+        "--input-dir", type=str, nargs="+", help="One or more directories containing input images."
     )
     group.add_argument(
-        "--input-file",
-        type=str,
-        nargs="+",
-        help="One or more paths to individual input images.",
+        "--input-file", type=str, nargs="+", help="One or more paths to individual input images."
     )
     parser.add_argument(
         "--model-path",
@@ -102,10 +96,7 @@ def parse_args():
         help="Number of geometric transforms for LodeSTAR equivariance.",
     )
     parser.add_argument(
-        "--epochs",
-        type=int,
-        default=100,
-        help="Number of max epochs for training LodeSTAR.",
+        "--epochs", type=int, default=100, help="Number of max epochs for training LodeSTAR."
     )
     parser.add_argument(
         "--crop-size",
@@ -116,29 +107,16 @@ def parse_args():
             "centre-crop if larger (default: 64)."
         ),
     )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=8,
-        help="Batch size for DataLoader.",
-    )
+    parser.add_argument("--batch-size", type=int, default=8, help="Batch size for DataLoader.")
     parser.add_argument(
         "--num-workers",
         type=int,
         default=0,
         help="Number of DataLoader worker processes. 0 is safest.",
     )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
     parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed for reproducibility.",
-    )
-    parser.add_argument(
-        "--experiment",
-        type=str,
-        default="lodestar",
-        help="MLflow experiment name.",
+        "--experiment", type=str, default="lodestar", help="MLflow experiment name."
     )
     parser.add_argument(
         "--run-name",
@@ -181,15 +159,17 @@ def parse_args():
 
 def _pad_to_square(img: Image.Image, size: int) -> Image.Image:
     """Centre-crop oversized axes then zero-pad to exactly size×size."""
-    w, h = img.size
-    if w > size or h > size:
-        left = max((w - size) // 2, 0)
-        top = max((h - size) // 2, 0)
-        img = img.crop((left, top, left + min(w, size), top + min(h, size)))
-        w, h = img.size
-    pad_l = (size - w) // 2
-    pad_t = (size - h) // 2
-    return ImageOps.expand(img, border=(pad_l, pad_t, size - w - pad_l, size - h - pad_t), fill=0)
+    img_width, img_height = img.size
+    if img_width > size or img_height > size:
+        left = max((img_width - size) // 2, 0)
+        top = max((img_height - size) // 2, 0)
+        img = img.crop((left, top, left + min(img_width, size), top + min(img_height, size)))
+        img_width, img_height = img.size
+    pad_l = (size - img_width) // 2
+    pad_t = (size - img_height) // 2
+    return ImageOps.expand(
+        img, border=(pad_l, pad_t, size - img_width - pad_l, size - img_height - pad_t), fill=0
+    )
 
 
 def _load_crops(image_files, crop_size=64):
@@ -247,9 +227,7 @@ def _build_and_train(args, crops_data):
     print(f"Training LodeSTAR on {len(crops_data)} crops.")
 
     lodestar = dl.LodeSTAR(
-        n_transforms=args.n_transforms,
-        num_outputs=args.num_outputs,
-        optimizer=dl.Adam(lr=1e-3),
+        n_transforms=args.n_transforms, num_outputs=args.num_outputs, optimizer=dl.Adam(lr=1e-3)
     ).build()
 
     datasets = [
@@ -278,9 +256,7 @@ def _build_and_train(args, crops_data):
         stopping_metrics = ["within_image_disagreement", "between_image_disagreement"]
 
     early_stop = _DualEarlyStopping(
-        metrics=stopping_metrics,
-        patience=args.patience,
-        min_delta=args.min_delta,
+        metrics=stopping_metrics, patience=args.patience, min_delta=args.min_delta
     )
     precision = "16-mixed" if torch.cuda.is_available() else "32-true"
     dl.Trainer(
@@ -320,38 +296,40 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
     elif args.input_file:
         # If specific files are given, use their parent directories as source_dirs
         # for logging purposes in MLflow.
-        source_dirs = list(set(os.path.dirname(os.path.abspath(f)) for f in args.input_file))
-        for f in args.input_file:
-            if os.path.isfile(f) and os.path.splitext(f)[1].lower() in valid_exts:
-                crop_files_set.add(os.path.abspath(f))
+        source_dirs = list(
+            set(os.path.dirname(os.path.abspath(fpath)) for fpath in args.input_file)
+        )
+        for fpath in args.input_file:
+            if os.path.isfile(fpath) and os.path.splitext(fpath)[1].lower() in valid_exts:
+                crop_files_set.add(os.path.abspath(fpath))
 
     if args.input_dir:
         for base_dir in source_dirs:
             # Check base directory directly
             found_base = [
-                os.path.join(base_dir, fn)
-                for fn in os.listdir(base_dir)
-                if os.path.isfile(os.path.join(base_dir, fn))
-                and os.path.splitext(fn)[1].lower() in valid_exts
+                os.path.join(base_dir, filename)
+                for filename in os.listdir(base_dir)
+                if os.path.isfile(os.path.join(base_dir, filename))
+                and os.path.splitext(filename)[1].lower() in valid_exts
             ]
             if found_base:
                 print(f"Found {len(found_base)} image(s) in {base_dir}")
-                for f in found_base:
-                    crop_files_set.add(os.path.abspath(f))
+                for fpath in found_base:
+                    crop_files_set.add(os.path.abspath(fpath))
 
             # Also check 'crops' subdirectory
             crops_dir = os.path.join(base_dir, "crops")
             if os.path.isdir(crops_dir):
                 found_crops = [
-                    os.path.join(crops_dir, fn)
-                    for fn in os.listdir(crops_dir)
-                    if os.path.isfile(os.path.join(crops_dir, fn))
-                    and os.path.splitext(fn)[1].lower() in valid_exts
+                    os.path.join(crops_dir, filename)
+                    for filename in os.listdir(crops_dir)
+                    if os.path.isfile(os.path.join(crops_dir, filename))
+                    and os.path.splitext(filename)[1].lower() in valid_exts
                 ]
                 if found_crops:
                     print(f"Found {len(found_crops)} image(s) in {crops_dir}")
-                    for f in found_crops:
-                        crop_files_set.add(os.path.abspath(f))
+                    for fpath in found_crops:
+                        crop_files_set.add(os.path.abspath(fpath))
             elif not found_base:
                 print(f"Warning: No images found in {base_dir} or {crops_dir}")
 
@@ -405,13 +383,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         print(f"Model saved to {args.model_path}")
 
         # Save companion JSON so label_images.py can reconstruct the architecture
-        config = {
-            "n_transforms": args.n_transforms,
-            "num_outputs": args.num_outputs,
-        }
+        config = {"n_transforms": args.n_transforms, "num_outputs": args.num_outputs}
         config_path = os.path.splitext(args.model_path)[0] + ".json"
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2)
+        with open(config_path, "w", encoding="utf-8") as config_file:
+            json.dump(config, config_file, indent=2)
         print(f"Config saved to {config_path}")
 
         mlflow.log_artifact(args.model_path)

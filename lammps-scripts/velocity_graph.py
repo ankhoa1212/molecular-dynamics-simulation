@@ -83,7 +83,7 @@ def plot_velocity_over_time(filename, output_dir, no_show=False):
     # Generate output filename
     base_name = os.path.basename(filename)
     if "." in base_name:
-        base_name = base_name[:base_name.rfind(".")]
+        base_name = base_name[: base_name.rfind(".")]
 
     output_filename = f"{base_name}_velocity_graph.png"
 
@@ -102,19 +102,17 @@ def plot_velocity_over_time(filename, output_dir, no_show=False):
 # plot_velocity_over_time('your_file.lammpstrj')
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
+    PARSER = argparse.ArgumentParser(
         description="Plot velocity over time from LAMMPS trajectory file"
     )
-    parser.add_argument(
+    PARSER.add_argument(
         "--filename",
         "-f",
         default=os.path.join(os.getcwd(), "test_same", "test.in_100_5.0.lammpstrj"),
         help="Path to the LAMMPS trajectory file",
     )
-    parser.add_argument(
-        "--output_dir", default=None, help="output directory to save graph file to"
-    )
-    parser.add_argument("--no-show", action="store_true", help="Do not display the graph")
-    args = parser.parse_args()
+    PARSER.add_argument("--output_dir", default=None, help="output directory to save graph file to")
+    PARSER.add_argument("--no-show", action="store_true", help="Do not display the graph")
+    ARGS = PARSER.parse_args()
 
-    plot_velocity_over_time(args.filename, args.output_dir, args.no_show)
+    plot_velocity_over_time(ARGS.filename, ARGS.output_dir, ARGS.no_show)

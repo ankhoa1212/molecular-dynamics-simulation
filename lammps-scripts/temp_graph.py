@@ -21,7 +21,7 @@ def generate_temp_graph_filename(filename, ending, output_dir=None):
     # Get base filename without extension
     base_name = os.path.basename(filename)
     if "." in base_name:
-        base_name = base_name[:base_name.rfind(".")]
+        base_name = base_name[: base_name.rfind(".")]
 
     out_name = f"{base_name}_temp_graph_{ending}.png"
 
@@ -43,8 +43,8 @@ def plot_log_temperature(filename, output_dir=None, no_show=False):
     reading_data = False
 
     try:
-        with open(filename, "r", encoding="utf-8") as f:
-            for line in f:
+        with open(filename, "r", encoding="utf-8") as log_file:
+            for line in log_file:
                 # Detect the start of the data table in log.lammps
                 if "Step" in line and "Temp" in line:
                     reading_data = True
@@ -62,10 +62,10 @@ def plot_log_temperature(filename, output_dir=None, no_show=False):
                         try:
                             # Typically Step is Col 0, Temp is Col 1
                             # Based on: thermo_style custom step temp ...
-                            s = int(parts[0])
-                            t = float(parts[1])
-                            steps.append(s)
-                            temps.append(t)
+                            step = int(parts[0])
+                            temp = float(parts[1])
+                            steps.append(step)
+                            temps.append(temp)
                         except ValueError:
                             continue
     except FileNotFoundError:
@@ -101,9 +101,7 @@ def _process_atom_lines(atom_lines):
     for line in atom_lines:
         parts = line.split()
         # x, y, vx, vy are indices 2, 3, 4, 5
-        data_list.append([
-            float(parts[2]), float(parts[3]), float(parts[4]), float(parts[5])
-        ])
+        data_list.append([float(parts[2]), float(parts[3]), float(parts[4]), float(parts[5])])
 
     data_arr = np.array(data_list)
     return data_arr[:, 0], data_arr[:, 1], data_arr[:, 2], data_arr[:, 3]
@@ -113,30 +111,30 @@ def _compute_radial_projection(x, y, vx, vy):
     """Computes radial velocity and tangential squared velocity."""
     center_x = 100.0
     center_y = 100.0
-    dx = x - center_x
-    dy = y - center_y
-    dist = np.sqrt(dx**2 + dy**2)
+    delta_x = x - center_x
+    delta_y = y - center_y
+    dist = np.sqrt(delta_x**2 + delta_y**2)
 
     with np.errstate(divide="ignore", invalid="ignore"):
-        rx = np.divide(dx, dist, out=np.zeros_like(dx), where=dist != 0)
-        ry = np.divide(dy, dist, out=np.zeros_like(dy), where=dist != 0)
+        unit_radial_x = np.divide(delta_x, dist, out=np.zeros_like(delta_x), where=dist != 0)
+        unit_radial_y = np.divide(delta_y, dist, out=np.zeros_like(delta_y), where=dist != 0)
 
-    v_rad = vx * rx + vy * ry
-    v_sq = vx**2 + vy**2
-    v_tan_sq = v_sq - v_rad**2
-    return v_rad, v_sq, v_tan_sq
+    v_rad = vx * unit_radial_x + vy * unit_radial_y
+    vel_sq = vx**2 + vy**2
+    vel_tan_sq = vel_sq - v_rad**2
+    return v_rad, vel_sq, vel_tan_sq
 
 
-def _compute_frame_temperature(x, y, vx, vy, n_atoms):
+def _compute_frame_temperature(x, y, vx, vy, num_atoms):
     """
     Computes standard and drift-corrected temperatures for a single frame.
     """
-    v_rad, v_sq, v_tan_sq = _compute_radial_projection(x, y, vx, vy)
+    v_rad, vel_sq, vel_tan_sq = _compute_radial_projection(x, y, vx, vy)
 
     # --- 2. Calculate "Standard" Total Temperature ---
     # Raw KE = 0.5 * m * (vx^2 + vy^2)
     # T = Sum(v^2) / (2 * N)  [2 Degrees of Freedom]
-    t_tot = np.sum(v_sq) / (2.0 * n_atoms)
+    total_temp = np.sum(vel_sq) / (2.0 * num_atoms)
 
     # --- 3. Calculate Drift-Corrected Temperature ---
     # Calculate the Mean Radial Velocity (The "Bulk Implosion Speed")
@@ -146,16 +144,16 @@ def _compute_frame_temperature(x, y, vx, vy, n_atoms):
     v_rad_fluctuation = v_rad - mean_v_rad
 
     # Re-calculate Total Kinetic Energy using the FLUCTUATIONS only
-    corrected_sq_sum = np.sum(v_tan_sq + v_rad_fluctuation**2)
-    t_corrected = corrected_sq_sum / (2.0 * n_atoms)
+    corrected_sq_sum = np.sum(vel_tan_sq + v_rad_fluctuation**2)
+    corrected_temp = corrected_sq_sum / (2.0 * num_atoms)
 
-    return t_tot, t_corrected
+    return total_temp, corrected_temp
 
 
 def _calculate_temps_for_frame(frame):
     """calculates temperature for a single frame"""
     x, y, vx, vy = _process_atom_lines(frame["atoms"])
-    return _compute_frame_temperature(x, y, vx, vy, frame["n_atoms"])
+    return _compute_frame_temperature(x, y, vx, vy, frame["num_atoms"])
 
 
 def plot_temperatures(filename, output_dir=None, no_show=False):
@@ -170,14 +168,14 @@ def plot_temperatures(filename, output_dir=None, no_show=False):
 
     try:
         for frame in parse_lammps_dump(filename):
-            if frame["n_atoms"] == 0:
+            if frame["num_atoms"] == 0:
                 continue
 
-            t_tot, t_corr = _calculate_temps_for_frame(frame)
+            total_temp, corrected_temp = _calculate_temps_for_frame(frame)
 
             timesteps.append(frame["timestep"])
-            total_temps.append(t_tot)
-            corrected_temps.append(t_corr)
+            total_temps.append(total_temp)
+            corrected_temps.append(corrected_temp)
 
     except FileNotFoundError:
         print(f"Error: File '{filename}' not found.")
@@ -223,26 +221,24 @@ def plot_temperatures(filename, output_dir=None, no_show=False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
+    PARSER = argparse.ArgumentParser(
         description="Plot drift-corrected temperature from LAMMPS trajectory"
     )
-    ex = (
+    EX = (
         "/home/austin/git/molecular-dynamics-simulation/"
         "lammps-scripts/test_same/test.in_100_5.0.lammpstrj"
     )
 
     # ex = '.../test_same/logs/test.in_100_5.0.log'
-    parser.add_argument("--filename", "-f", default=ex, help="Path to file")
-    parser.add_argument("--output_dir", default=None, help="Output directory")
-    parser.add_argument(
-        "--no-show", action="store_true", help="Do not display the graph"
-    )
-    args = parser.parse_args()
-    if args.filename.endswith(".log"):
-        plot_log_temperature(args.filename, args.output_dir, args.no_show)
-    elif args.filename.endswith(".lammpstrj"):
+    PARSER.add_argument("--filename", "-f", default=EX, help="Path to file")
+    PARSER.add_argument("--output_dir", default=None, help="Output directory")
+    PARSER.add_argument("--no-show", action="store_true", help="Do not display the graph")
+    ARGS = PARSER.parse_args()
+    if ARGS.filename.endswith(".log"):
+        plot_log_temperature(ARGS.filename, ARGS.output_dir, ARGS.no_show)
+    elif ARGS.filename.endswith(".lammpstrj"):
         print("Note: graphing the .log file will be more accurate")
-        plot_temperatures(args.filename, args.output_dir, args.no_show)
+        plot_temperatures(ARGS.filename, ARGS.output_dir, ARGS.no_show)
     else:
         print("Error: File should be either .log or .lammpstrj")
         sys.exit(1)

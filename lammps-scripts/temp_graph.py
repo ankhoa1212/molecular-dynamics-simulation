@@ -113,15 +113,15 @@ def _compute_radial_projection(x, y, vx, vy):
     center_y = 100.0
     delta_x = x - center_x
     delta_y = y - center_y
-    dist = np.sqrt(delta_x ** 2 + delta_y ** 2)
+    dist = np.sqrt(delta_x**2 + delta_y**2)
 
     with np.errstate(divide="ignore", invalid="ignore"):
         unit_radial_x = np.divide(delta_x, dist, out=np.zeros_like(delta_x), where=dist != 0)
         unit_radial_y = np.divide(delta_y, dist, out=np.zeros_like(delta_y), where=dist != 0)
 
     v_rad = vx * unit_radial_x + vy * unit_radial_y
-    vel_sq = vx ** 2 + vy ** 2
-    vel_tan_sq = vel_sq - v_rad ** 2
+    vel_sq = vx**2 + vy**2
+    vel_tan_sq = vel_sq - v_rad**2
     return v_rad, vel_sq, vel_tan_sq
 
 
@@ -144,7 +144,7 @@ def _compute_frame_temperature(x, y, vx, vy, num_atoms):
     v_rad_fluctuation = v_rad - mean_v_rad
 
     # Re-calculate Total Kinetic Energy using the FLUCTUATIONS only
-    corrected_sq_sum = np.sum(vel_tan_sq + v_rad_fluctuation ** 2)
+    corrected_sq_sum = np.sum(vel_tan_sq + v_rad_fluctuation**2)
     corrected_temp = corrected_sq_sum / (2.0 * num_atoms)
 
     return total_temp, corrected_temp

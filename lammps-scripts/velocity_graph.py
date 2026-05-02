@@ -46,7 +46,7 @@ def _process_velocity_data(filename):
             if len(parts) > max(vx_idx, vy_idx):
                 vx = float(parts[vx_idx])
                 vy = float(parts[vy_idx])
-                raw_data.append(np.sqrt(vx ** 2 + vy ** 2))
+                raw_data.append(np.sqrt(vx**2 + vy**2))
 
         if raw_data:
             avg_velocities.append(np.mean(raw_data))

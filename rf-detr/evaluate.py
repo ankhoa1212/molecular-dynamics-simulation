@@ -94,10 +94,10 @@ def main() -> None:
             boxes[:, 2] += boxes[:, 0]
             boxes[:, 3] += boxes[:, 1]
             class_ids = np.array([a["category_id"] - 1 for a in annotations])
-            gt = sv.Detections(xyxy=boxes, class_id=class_ids)
+            ground_truth = sv.Detections(xyxy=boxes, class_id=class_ids)
         else:
-            gt = sv.Detections.empty()
-        all_targets.append(gt)
+            ground_truth = sv.Detections.empty()
+        all_targets.append(ground_truth)
 
     map_metric = MeanAveragePrecision()
     map_metric.update(all_predictions, all_targets)
@@ -109,11 +109,19 @@ def main() -> None:
     # matrix shape: (num_classes+1, num_classes+1); last index = background
     # matrix[actual][predicted]
     matrix = confusion.matrix
-    tp = float(matrix[0][0])
-    fp = float(matrix[matrix.shape[0] - 1][0])
-    fn = float(matrix[0][matrix.shape[1] - 1])
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    true_positives = float(matrix[0][0])
+    false_positives = float(matrix[matrix.shape[0] - 1][0])
+    false_negatives = float(matrix[0][matrix.shape[1] - 1])
+    precision = (
+        true_positives / (true_positives + false_positives)
+        if (true_positives + false_positives) > 0
+        else 0.0
+    )
+    recall = (
+        true_positives / (true_positives + false_negatives)
+        if (true_positives + false_negatives) > 0
+        else 0.0
+    )
 
     metrics = {
         "test/mAP50": float(map_result.map50),

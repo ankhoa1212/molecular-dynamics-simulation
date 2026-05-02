@@ -289,42 +289,42 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         )
         self._update_status()
 
-    def _find_crop_at(self, cx: float, cy: float) -> tuple[Optional[str], Optional[int]]:
-        """Return (type, index) of the topmost annotation whose canvas rect contains (cx, cy)."""
+    def _find_crop_at(self, canvas_x: float, canvas_y: float) -> tuple[Optional[str], Optional[int]]:
+        """Return (type, index) of the topmost annotation whose canvas rect contains (canvas_x, canvas_y)."""
         # Check manual annotations first (they are on top)
         for i in range(len(self._manual_annots) - 1, -1, -1):
             x1, y1, x2, y2, _ = self._manual_annots[i]
-            rx1, ry1 = self._image_to_canvas(x1, y1)
-            rx2, ry2 = self._image_to_canvas(x2, y2)
-            if rx1 <= cx <= rx2 and ry1 <= cy <= ry2:
+            rect_canvas_x1, rect_canvas_y1 = self._image_to_canvas(x1, y1)
+            rect_canvas_x2, rect_canvas_y2 = self._image_to_canvas(x2, y2)
+            if rect_canvas_x1 <= canvas_x <= rect_canvas_x2 and rect_canvas_y1 <= canvas_y <= rect_canvas_y2:
                 return "manual", i
 
         # Check YOLO reference labels
         for i in range(len(self._yolo_labels) - 1, -1, -1):
             x1, y1, x2, y2, _ = self._yolo_labels[i]
-            rx1, ry1 = self._image_to_canvas(x1, y1)
-            rx2, ry2 = self._image_to_canvas(x2, y2)
-            if rx1 <= cx <= rx2 and ry1 <= cy <= ry2:
+            rect_canvas_x1, rect_canvas_y1 = self._image_to_canvas(x1, y1)
+            rect_canvas_x2, rect_canvas_y2 = self._image_to_canvas(x2, y2)
+            if rect_canvas_x1 <= canvas_x <= rect_canvas_x2 and rect_canvas_y1 <= canvas_y <= rect_canvas_y2:
                 return "yolo", i
 
         return None, None
 
-    def _get_handle_at(self, cx: float, cy: float, idx: int) -> Optional[str]:
-        """Return 'nw'|'ne'|'sw'|'se' if (cx, cy) is near a corner handle of crop[idx]."""
+    def _get_handle_at(self, canvas_x: float, canvas_y: float, idx: int) -> Optional[str]:
+        """Return 'nw'|'ne'|'sw'|'se' if (canvas_x, canvas_y) is near a corner handle of crop[idx]."""
         x1, y1, x2, y2, _ = self._manual_annots[idx]
-        rx1, ry1 = self._image_to_canvas(x1, y1)
-        rx2, ry2 = self._image_to_canvas(x2, y2)
-        handles = [("nw", rx1, ry1), ("ne", rx2, ry1), ("sw", rx1, ry2), ("se", rx2, ry2)]
-        for name, hx, hy in handles:
-            if abs(cx - hx) <= HANDLE_HIT and abs(cy - hy) <= HANDLE_HIT:
+        rect_canvas_x1, rect_canvas_y1 = self._image_to_canvas(x1, y1)
+        rect_canvas_x2, rect_canvas_y2 = self._image_to_canvas(x2, y2)
+        handles = [("nw", rect_canvas_x1, rect_canvas_y1), ("ne", rect_canvas_x2, rect_canvas_y1), ("sw", rect_canvas_x1, rect_canvas_y2), ("se", rect_canvas_x2, rect_canvas_y2)]
+        for name, handle_x, handle_y in handles:
+            if abs(canvas_x - handle_x) <= HANDLE_HIT and abs(canvas_y - handle_y) <= HANDLE_HIT:
                 return name
         return None
 
     def _on_edit_start(self, event: tk.Event) -> None:
-        cx, cy = float(event.x), float(event.y)
+        canvas_x, canvas_y = float(event.x), float(event.y)
         # If a manual crop is already selected, check its handles first
         if self._selected_idx is not None and self._selected_type == "manual":
-            handle = self._get_handle_at(cx, cy, self._selected_idx)
+            handle = self._get_handle_at(canvas_x, canvas_y, self._selected_idx)
             if handle:
                 self._edit_drag_mode = f"resize_{handle}"
                 self._edit_drag_start_canvas = (event.x, event.y)
@@ -333,7 +333,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                 return
 
         # Hit-test all crops (topmost first)
-        kind, idx = self._find_crop_at(cx, cy)
+        kind, idx = self._find_crop_at(canvas_x, canvas_y)
         if idx is not None:
             self._selected_idx = idx
             self._selected_type = kind
@@ -378,30 +378,30 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             return
         dcx = event.x - self._edit_drag_start_canvas[0]
         dcy = event.y - self._edit_drag_start_canvas[1]
-        ds = self.display_scale
-        dix = dcx / ds
-        diy = dcy / ds
-        ox1, oy1, ox2, oy2 = self._edit_drag_crop_orig
-        iw, ih = self.pil_image.size
+        display_scale = self.display_scale
+        img_x_delta = (event.x - self._edit_drag_start_canvas[0]) / display_scale
+        img_y_delta = (event.y - self._edit_drag_start_canvas[1]) / display_scale
+        orig_x1, orig_y1, orig_x2, orig_y2 = self._edit_drag_crop_orig
+        img_width, img_height = self.pil_image.size
         _, _, _, _, path = self._manual_annots[self._selected_idx]
         if self._edit_drag_mode == "move":
-            w, h = ox2 - ox1, oy2 - oy1
-            nx1 = int(max(0, min(iw - w, ox1 + dix)))
-            ny1 = int(max(0, min(ih - h, oy1 + diy)))
-            nx2 = nx1 + w
-            ny2 = ny1 + h
+            width, height = orig_x2 - orig_x1, orig_y2 - orig_y1
+            new_x1 = int(max(0, min(img_width - width, orig_x1 + img_x_delta)))
+            new_y1 = int(max(0, min(img_height - height, orig_y1 + img_y_delta)))
+            new_x2 = new_x1 + width
+            new_y2 = new_y1 + height
         else:
             corner = self._edit_drag_mode[len("resize_") :]
-            nx1, ny1, nx2, ny2 = ox1, oy1, ox2, oy2
+            new_x1, new_y1, new_x2, new_y2 = orig_x1, orig_y1, orig_x2, orig_y2
             if "w" in corner:
-                nx1 = int(max(0, min(ox2 - MIN_CROP_PX, ox1 + dix)))
+                new_x1 = int(max(0, min(orig_x2 - MIN_CROP_PX, orig_x1 + img_x_delta)))
             if "e" in corner:
-                nx2 = int(max(ox1 + MIN_CROP_PX, min(iw, ox2 + dix)))
+                new_x2 = int(max(orig_x1 + MIN_CROP_PX, min(img_width, orig_x2 + img_x_delta)))
             if "n" in corner:
-                ny1 = int(max(0, min(oy2 - MIN_CROP_PX, oy1 + diy)))
+                new_y1 = int(max(0, min(orig_y2 - MIN_CROP_PX, orig_y1 + img_y_delta)))
             if "s" in corner:
-                ny2 = int(max(oy1 + MIN_CROP_PX, min(ih, oy2 + diy)))
-        self._manual_annots[self._selected_idx] = (nx1, ny1, nx2, ny2, path)
+                new_y2 = int(max(orig_y1 + MIN_CROP_PX, min(img_height, orig_y2 + img_y_delta)))
+        self._manual_annots[self._selected_idx] = (new_x1, new_y1, new_x2, new_y2, path)
         self._redraw()
 
     def _on_edit_end(self, _event: tk.Event) -> None:  # pylint: disable=too-many-locals
@@ -415,12 +415,12 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             self._edit_drag_mode = None
             self._edit_drag_crop_orig = None
             return
-        nx1, ny1, nx2, ny2, old_path = self._manual_annots[self._selected_idx]
-        ox1, oy1, ox2, oy2 = self._edit_drag_crop_orig
+        new_x1, new_y1, new_x2, new_y2, old_path = self._manual_annots[self._selected_idx]
+        orig_x1, orig_y1, orig_x2, orig_y2 = self._edit_drag_crop_orig
         self._edit_drag_mode = None
         self._edit_drag_start_canvas = None
         self._edit_drag_crop_orig = None
-        if (nx1, ny1, nx2, ny2) == (ox1, oy1, ox2, oy2):
+        if (new_x1, new_y1, new_x2, new_y2) == (orig_x1, orig_y1, orig_x2, orig_y2):
             return  # no change — nothing to persist
         try:
             new_path = None
@@ -448,22 +448,22 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                 if old_path:
                     old_path.unlink(missing_ok=True)
 
-            self._manual_annots[self._selected_idx] = (nx1, ny1, nx2, ny2, new_path)
+            self._manual_annots[self._selected_idx] = (new_x1, new_y1, new_x2, new_y2, new_path)
             self._sync_yolo_labels_file()
             self._undo_stack.append(
                 {
                     "type": "edit",
                     "old_path": old_path,
-                    "old_coords": (ox1, oy1, ox2, oy2),
+                    "old_coords": (orig_x1, orig_y1, orig_x2, orig_y2),
                     "new_path": new_path,
-                    "new_coords": (nx1, ny1, nx2, ny2),
+                    "new_coords": (new_x1, new_y1, new_x2, new_y2),
                 }
             )
             self._redraw()
             self._update_status()
         except Exception as exc:  # pylint: disable=broad-except
             self._status.set(f"Save failed: {exc}")
-            self._manual_annots[self._selected_idx] = (ox1, oy1, ox2, oy2, old_path)
+            self._manual_annots[self._selected_idx] = (orig_x1, orig_y1, orig_x2, orig_y2, old_path)
             self._redraw()
             return
 
@@ -696,86 +696,86 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         """Compute fit_scale and letterbox offsets; defer if canvas not yet sized."""
         if self.pil_image is None:
             return
-        cw = self.canvas.winfo_width()
-        ch = self.canvas.winfo_height()
-        if cw <= 1 or ch <= 1:
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        if canvas_width <= 1 or canvas_height <= 1:
             self.root.after(50, self._fit_to_canvas)
             return
-        iw, ih = self.pil_image.size
-        self.fit_scale = min(cw / iw, ch / ih)
-        self.img_offset_x = (cw - iw * self.fit_scale) / 2
-        self.img_offset_y = (ch - ih * self.fit_scale) / 2
+        img_width, img_height = self.pil_image.size
+        self.fit_scale = min(canvas_width / img_width, canvas_height / img_height)
+        self.img_offset_x = (canvas_width - img_width * self.fit_scale) / 2
+        self.img_offset_y = (canvas_height - img_height * self.fit_scale) / 2
         self._redraw()
 
-    def _canvas_to_image(self, cx: float, cy: float) -> tuple[float, float]:
-        ds = self.display_scale
+    def _canvas_to_image(self, canvas_x: float, canvas_y: float) -> tuple[float, float]:
+        display_scale = self.display_scale
         return (
-            (cx - self.img_offset_x - self.pan_x) / ds,
-            (cy - self.img_offset_y - self.pan_y) / ds,
+            (canvas_x - self.img_offset_x - self.pan_x) / display_scale,
+            (canvas_y - self.img_offset_y - self.pan_y) / display_scale,
         )
 
-    def _image_to_canvas(self, ix: float, iy: float) -> tuple[float, float]:
-        ds = self.display_scale
-        return (ix * ds + self.img_offset_x + self.pan_x, iy * ds + self.img_offset_y + self.pan_y)
+    def _image_to_canvas(self, img_x: float, img_y: float) -> tuple[float, float]:
+        display_scale = self.display_scale
+        return (img_x * display_scale + self.img_offset_x + self.pan_x, img_y * display_scale + self.img_offset_y + self.pan_y)
 
-    def _clamp_to_image(self, ix: float, iy: float) -> tuple[int, int]:
+    def _clamp_to_image(self, img_x: float, img_y: float) -> tuple[int, int]:
         if self.pil_image is None:
             return 0, 0
-        iw, ih = self.pil_image.size
-        return int(max(0, min(iw, ix))), int(max(0, min(ih, iy)))
+        img_width, img_height = self.pil_image.size
+        return int(max(0, min(img_width, img_x))), int(max(0, min(img_height, img_y)))
 
     # ── Rendering ─────────────────────────────────────────────────────────────
 
     def _redraw(self) -> None:  # pylint: disable=too-many-locals
         if self.pil_image is None or self.cv_image is None:
             return
-        ds = self.display_scale
-        iw, ih = self.pil_image.size
-        new_w = max(1, int(iw * ds))
-        new_h = max(1, int(ih * ds))
+        display_scale = self.display_scale
+        img_width, img_height = self.pil_image.size
+        new_width = max(1, int(img_width * display_scale))
+        new_height = max(1, int(img_height * display_scale))
 
         self.canvas.delete("all")
 
-        cw = self.canvas.winfo_width()
-        ch = self.canvas.winfo_height()
-        if cw <= 1 or ch <= 1:
-            cw, ch = 800, 600
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        if canvas_width <= 1 or canvas_height <= 1:
+            canvas_width, canvas_height = 800, 600
 
         img_x = int(self.img_offset_x + self.pan_x)
         img_y = int(self.img_offset_y + self.pan_y)
 
         scaled_x_start = max(0, -img_x)
         scaled_y_start = max(0, -img_y)
-        scaled_x_end = min(new_w, cw - img_x)
-        scaled_y_end = min(new_h, ch - img_y)
+        scaled_x_end = min(new_width, canvas_width - img_x)
+        scaled_y_end = min(new_height, canvas_height - img_y)
 
-        o_x_start = int(scaled_x_start / ds)
-        o_y_start = int(scaled_y_start / ds)
-        o_x_end = int(math.ceil(scaled_x_end / ds))
-        o_y_end = int(math.ceil(scaled_y_end / ds))
+        origin_x_start = int(scaled_x_start / display_scale)
+        origin_y_start = int(scaled_y_start / display_scale)
+        origin_x_end = int(math.ceil(scaled_x_end / display_scale))
+        origin_y_end = int(math.ceil(scaled_y_end / display_scale))
 
-        o_x_start = max(0, min(iw - 1, o_x_start))
-        o_y_start = max(0, min(ih - 1, o_y_start))
-        o_x_end = max(0, min(iw, o_x_end))
-        o_y_end = max(0, min(ih, o_y_end))
+        origin_x_start = max(0, min(img_width - 1, origin_x_start))
+        origin_y_start = max(0, min(img_height - 1, origin_y_start))
+        origin_x_end = max(0, min(img_width, origin_x_end))
+        origin_y_end = max(0, min(img_height, origin_y_end))
 
         if o_x_end <= o_x_start or o_y_end <= o_y_start:
             self._draw_crop_overlays()
             return
 
-        crop = self.cv_image[o_y_start:o_y_end, o_x_start:o_x_end]
+        crop = self.cv_image[origin_y_start:origin_y_end, origin_x_start:origin_x_end]
 
-        crop_new_w = max(1, int((o_x_end - o_x_start) * ds))
-        crop_new_h = max(1, int((o_y_end - o_y_start) * ds))
+        crop_new_width = max(1, int((origin_x_end - origin_x_start) * display_scale))
+        crop_new_height = max(1, int((origin_y_end - origin_y_start) * display_scale))
 
         # pylint: disable=no-member
-        interp = cv2.INTER_NEAREST if ds > 2 else cv2.INTER_LINEAR
-        resized_crop = cv2.resize(crop, (crop_new_w, crop_new_h), interpolation=interp)
+        interp = cv2.INTER_NEAREST if display_scale > 2 else cv2.INTER_LINEAR
+        resized_crop = cv2.resize(crop, (crop_new_width, crop_new_height), interpolation=interp)
         # pylint: enable=no-member
         self._tk_img = ImageTk.PhotoImage(image=Image.fromarray(resized_crop))
 
-        anchor_x = img_x + int(o_x_start * ds)
-        anchor_y = img_y + int(o_y_start * ds)
+        anchor_x = img_x + int(origin_x_start * display_scale)
+        anchor_y = img_y + int(origin_y_start * display_scale)
 
         self._img_id = self.canvas.create_image(
             anchor_x, anchor_y, anchor=tk.NW, image=self._tk_img, tags="image"
@@ -825,13 +825,13 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
                     tags="overlay",
                 )
             else:  # point mode
-                mx, my = (cx1 + cx2) / 2, (cy1 + cy2) / 2
+                mid_x, mid_y = (canvas_x1 + canvas_x2) / 2, (canvas_y1 + canvas_y2) / 2
                 r = 4 if selected else 3
                 self.canvas.create_oval(
-                    mx - r,
-                    my - r,
-                    mx + r,
-                    my + r,
+                    mid_x - r,
+                    mid_y - r,
+                    mid_x + r,
+                    mid_y + r,
                     fill=tag_color,
                     outline="white",
                     width=1,
@@ -853,26 +853,26 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
 
     def zoom_in(self) -> None:
         """Zoom into the image."""
-        cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
-        self._zoom_at(cw / 2, ch / 2, ZOOM_STEP)
+        canvas_width, canvas_height = self.canvas.winfo_width(), self.canvas.winfo_height()
+        self._zoom_at(canvas_width / 2, canvas_height / 2, ZOOM_STEP)
 
     def zoom_out(self) -> None:
         """Zoom out of the image."""
-        cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
-        self._zoom_at(cw / 2, ch / 2, 1 / ZOOM_STEP)
+        canvas_width, canvas_height = self.canvas.winfo_width(), self.canvas.winfo_height()
+        self._zoom_at(canvas_width / 2, canvas_height / 2, 1 / ZOOM_STEP)
 
-    def _zoom_at(self, cx: float, cy: float, factor: float) -> None:
-        """Zoom by factor, keeping the canvas point (cx, cy) fixed over the same image pixel."""
+    def _zoom_at(self, canvas_x: float, canvas_y: float, factor: float) -> None:
+        """Zoom by factor, keeping the canvas point (canvas_x, canvas_y) fixed over the same image pixel."""
         new_zoom = max(ZOOM_MIN, min(ZOOM_MAX, self.zoom_level * factor))
         if abs(new_zoom - self.zoom_level) < 1e-9:
             return
         # image point under cursor must stay at the same canvas position after zoom:
         # canvas_x = ix * new_ds + offset_x + new_pan_x  =>  new_pan_x = cx - offset_x - ix * new_ds
-        ix, iy = self._canvas_to_image(cx, cy)
+        img_x, img_y = self._canvas_to_image(canvas_x, canvas_y)
         self.zoom_level = new_zoom
-        new_ds = self.display_scale
-        self.pan_x = cx - self.img_offset_x - ix * new_ds
-        self.pan_y = cy - self.img_offset_y - iy * new_ds
+        new_display_scale = self.display_scale
+        self.pan_x = canvas_x - self.img_offset_x - img_x * new_display_scale
+        self.pan_y = canvas_y - self.img_offset_y - img_y * new_display_scale
         self._redraw()
         self._update_status()
 
@@ -958,14 +958,14 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             self._rect_id = None
 
         # Convert canvas corners → image coordinates
-        ix0, iy0 = self._canvas_to_image(x0c, y0c)
-        ix1, iy1 = self._canvas_to_image(event.x, event.y)
+        img_x0, img_y0 = self._canvas_to_image(canvas_x0_coord, canvas_y0_coord)
+        img_x1, img_y1 = self._canvas_to_image(event.x, event.y)
 
         # Clamp to image bounds and normalize (ensure top-left < bottom-right)
-        ix0, iy0 = self._clamp_to_image(ix0, iy0)
-        ix1, iy1 = self._clamp_to_image(ix1, iy1)
-        x1, x2 = (ix0, ix1) if ix0 <= ix1 else (ix1, ix0)
-        y1, y2 = (iy0, iy1) if iy0 <= iy1 else (iy1, iy0)
+        img_x0, img_y0 = self._clamp_to_image(img_x0, img_y0)
+        img_x1, img_y1 = self._clamp_to_image(img_x1, img_y1)
+        x1, x2 = (img_x0, img_x1) if img_x0 <= img_x1 else (img_x1, img_x0)
+        y1, y2 = (img_y0, img_y1) if img_y0 <= img_y1 else (img_y1, img_y0)
 
         if (x2 - x1) < MIN_CROP_PX or (y2 - y1) < MIN_CROP_PX:
             return  # too small — ignore accidental clicks
@@ -1308,16 +1308,16 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
             40, lambda: self._do_resize(event.width, event.height)
         )
 
-    def _do_resize(self, cw: int, ch: int) -> None:
+    def _do_resize(self, canvas_width: int, canvas_height: int) -> None:
         self._resize_after_id = None
         if self.pil_image is None:
             return
-        iw, ih = self.pil_image.size
-        new_fit = min(cw / iw, ch / ih)
+        img_width, img_height = self.pil_image.size
+        new_fit = min(canvas_width / img_width, canvas_height / img_height)
         old_fit = self.fit_scale
         self.fit_scale = new_fit
-        self.img_offset_x = (cw - iw * new_fit) / 2
-        self.img_offset_y = (ch - ih * new_fit) / 2
+        self.img_offset_x = (canvas_width - img_width * new_fit) / 2
+        self.img_offset_y = (canvas_height - img_height * new_fit) / 2
         # Scale pan proportionally so the visible image region doesn't jump
         if old_fit > 0:
             ratio = new_fit / old_fit

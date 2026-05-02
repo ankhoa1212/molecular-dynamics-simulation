@@ -227,32 +227,32 @@ def generate_commands(config, args, lammps_executable):
     with open("commands.txt", "w", encoding="utf-8") as f:
         pass
 
-    m = config["m_start"]
+    current_molecules = config["m_start"]
 
     while True:  # Molecules loop
         # Check condition
         if config["m_step"] > 0:
-            if m > config["m_end"]:
+            if current_molecules > config["m_end"]:
                 break
         else:
-            if m < config["m_end"]:
+            if current_molecules < config["m_end"]:
                 break
 
-        e = config["e_start"]
+        current_epsilon = config["e_start"]
 
-        while check_epsilon_loop(e, config["e_end"], config["e_step"]):
-            epsilon_val = f"{e:.1f}"
-            filename = f"{base_script_name}_{m}_{epsilon_val}"
+        while check_epsilon_loop(current_epsilon, config["e_end"], config["e_step"]):
+            epsilon_str = f"{current_epsilon:.1f}"
+            filename = f"{base_script_name}_{current_molecules}_{epsilon_str}"
             log_file = os.path.join(log_dir, f"{filename}.log")
 
-            current_tstart = epsilon_val if args.var_tstart == "epsilon" else args.var_tstart
-            current_tstop = epsilon_val if args.var_tstop == "epsilon" else args.var_tstop
+            current_tstart = epsilon_str if args.var_tstart == "epsilon" else args.var_tstart
+            current_tstop = epsilon_str if args.var_tstop == "epsilon" else args.var_tstop
 
             cmd = (
                 f'"{lammps_executable}" -in "{config["input_script"]}" '
                 f'-log "{log_file}" '
-                f'-var filename "{filename}" -var molecules "{m}" '
-                f'-var var_epsilon "{epsilon_val}" '
+                f'-var filename "{filename}" -var molecules "{current_molecules}" '
+                f'-var var_epsilon "{epsilon_str}" '
                 f'-var var_tstart "{current_tstart}" '
                 f'-var var_tstop "{current_tstop}" '
                 f'-var steps "{args.steps}" '
@@ -263,9 +263,9 @@ def generate_commands(config, args, lammps_executable):
             with open("commands.txt", "a", encoding="utf-8") as f:
                 f.write(cmd + "\n")
 
-            e += config["e_step"]
+            current_epsilon += config["e_step"]
 
-        m += config["m_step"]
+        current_molecules += config["m_step"]
 
     return commands, base_script_name, log_dir
 

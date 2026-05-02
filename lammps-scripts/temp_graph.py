@@ -62,10 +62,10 @@ def plot_log_temperature(filename, output_dir=None, no_show=False):
                         try:
                             # Typically Step is Col 0, Temp is Col 1
                             # Based on: thermo_style custom step temp ...
-                            s = int(parts[0])
-                            t = float(parts[1])
-                            steps.append(s)
-                            temps.append(t)
+                            step = int(parts[0])
+                            temp = float(parts[1])
+                            steps.append(step)
+                            temps.append(temp)
                         except ValueError:
                             continue
     except FileNotFoundError:
@@ -116,25 +116,25 @@ def _compute_radial_projection(x, y, vx, vy):
     dist = np.sqrt(dx ** 2 + dy ** 2)
 
     with np.errstate(divide="ignore", invalid="ignore"):
-        rx = np.divide(dx, dist, out=np.zeros_like(dx), where=dist != 0)
-        ry = np.divide(dy, dist, out=np.zeros_like(dy), where=dist != 0)
+        unit_radial_x = np.divide(dx, dist, out=np.zeros_like(dx), where=dist != 0)
+        unit_radial_y = np.divide(dy, dist, out=np.zeros_like(dy), where=dist != 0)
 
-    v_rad = vx * rx + vy * ry
-    v_sq = vx ** 2 + vy ** 2
-    v_tan_sq = v_sq - v_rad ** 2
-    return v_rad, v_sq, v_tan_sq
+    v_rad = vx * unit_radial_x + vy * unit_radial_y
+    vel_sq = vx ** 2 + vy ** 2
+    vel_tan_sq = vel_sq - v_rad ** 2
+    return v_rad, vel_sq, vel_tan_sq
 
 
 def _compute_frame_temperature(x, y, vx, vy, n_atoms):
     """
     Computes standard and drift-corrected temperatures for a single frame.
     """
-    v_rad, v_sq, v_tan_sq = _compute_radial_projection(x, y, vx, vy)
+    v_rad, vel_sq, vel_tan_sq = _compute_radial_projection(x, y, vx, vy)
 
     # --- 2. Calculate "Standard" Total Temperature ---
     # Raw KE = 0.5 * m * (vx^2 + vy^2)
     # T = Sum(v^2) / (2 * N)  [2 Degrees of Freedom]
-    t_tot = np.sum(v_sq) / (2.0 * n_atoms)
+    total_temp = np.sum(vel_sq) / (2.0 * n_atoms)
 
     # --- 3. Calculate Drift-Corrected Temperature ---
     # Calculate the Mean Radial Velocity (The "Bulk Implosion Speed")
@@ -144,10 +144,10 @@ def _compute_frame_temperature(x, y, vx, vy, n_atoms):
     v_rad_fluctuation = v_rad - mean_v_rad
 
     # Re-calculate Total Kinetic Energy using the FLUCTUATIONS only
-    corrected_sq_sum = np.sum(v_tan_sq + v_rad_fluctuation ** 2)
-    t_corrected = corrected_sq_sum / (2.0 * n_atoms)
+    corrected_sq_sum = np.sum(vel_tan_sq + v_rad_fluctuation ** 2)
+    corrected_temp = corrected_sq_sum / (2.0 * n_atoms)
 
-    return t_tot, t_corrected
+    return total_temp, corrected_temp
 
 
 def _calculate_temps_for_frame(frame):
@@ -171,11 +171,11 @@ def plot_temperatures(filename, output_dir=None, no_show=False):
             if frame["n_atoms"] == 0:
                 continue
 
-            t_tot, t_corr = _calculate_temps_for_frame(frame)
+            total_temp, corrected_temp = _calculate_temps_for_frame(frame)
 
             timesteps.append(frame["timestep"])
-            total_temps.append(t_tot)
-            corrected_temps.append(t_corr)
+            total_temps.append(total_temp)
+            corrected_temps.append(corrected_temp)
 
     except FileNotFoundError:
         print(f"Error: File '{filename}' not found.")

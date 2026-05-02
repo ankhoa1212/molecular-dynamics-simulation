@@ -303,10 +303,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
         for base_dir in source_dirs:
             # Check base directory directly
             found_base = [
-                os.path.join(base_dir, fn)
-                for fn in os.listdir(base_dir)
-                if os.path.isfile(os.path.join(base_dir, fn))
-                and os.path.splitext(fn)[1].lower() in valid_exts
+                os.path.join(base_dir, filename)
+                for filename in os.listdir(base_dir)
+                if os.path.isfile(os.path.join(base_dir, filename))
+                and os.path.splitext(filename)[1].lower() in valid_exts
             ]
             if found_base:
                 print(f"Found {len(found_base)} image(s) in {base_dir}")
@@ -317,10 +317,10 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
             crops_dir = os.path.join(base_dir, "crops")
             if os.path.isdir(crops_dir):
                 found_crops = [
-                    os.path.join(crops_dir, fn)
-                    for fn in os.listdir(crops_dir)
-                    if os.path.isfile(os.path.join(crops_dir, fn))
-                    and os.path.splitext(fn)[1].lower() in valid_exts
+                    os.path.join(crops_dir, filename)
+                    for filename in os.listdir(crops_dir)
+                    if os.path.isfile(os.path.join(crops_dir, filename))
+                    and os.path.splitext(filename)[1].lower() in valid_exts
                 ]
                 if found_crops:
                     print(f"Found {len(found_crops)} image(s) in {crops_dir}")

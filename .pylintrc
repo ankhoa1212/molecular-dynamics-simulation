@@ -57,18 +57,9 @@ good-names=
     f,e,ax,
     _,df,np,pd,plt,
     cv2,lr,
-    a,b,c,d,n,m,p,q,r,s,t,u,v,w,
     x0,y0,x1,y1,x2,y2,
-    cx,cy,xc,yc,
-    ix,iy,iw,ih,
-    dx,dy,ds,
-    rx,ry,hx,hy,
     vx,vy,
-    tp,fp,fn,
-    gt,
     xi,yi,
-    cw,ch,h,
-    mx,my,
 
 argument-naming-style=snake_case
 attr-naming-style=snake_case

@@ -189,11 +189,11 @@ def _nms(detections, min_dist):
         if suppressed[idx_i]:
             continue
         keep.append(det_i)
-        yi, xi = arr[idx_i, 0], arr[idx_i, 1]
+        target_y, target_x = arr[idx_i, 0], arr[idx_i, 1]
         for idx_j in range(idx_i + 1, len(arr)):
             if suppressed[idx_j]:
                 continue
-            dist = np.sqrt((arr[idx_j, 0] - yi) ** 2 + (arr[idx_j, 1] - xi) ** 2)
+            dist = np.sqrt((arr[idx_j, 0] - target_y) ** 2 + (arr[idx_j, 1] - target_x) ** 2)
             if dist < min_dist:
                 suppressed[idx_j] = True
     return keep

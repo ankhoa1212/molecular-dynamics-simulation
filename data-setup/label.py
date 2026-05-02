@@ -3,11 +3,12 @@ import pims
 import matplotlib.pyplot as plt
 import pandas as pd
 
+
 def main():
     """Run a simple trackpy labeling check on a sample image."""
     # Load image (convert to grayscale if needed)
     try:
-        frames = pims.open('your_image.jpg') 
+        frames = pims.open("your_image.jpg")
 
         # trackpy.locate(image, diameter, minmass, separation)
         # diameter: estimate of particle size in pixels (looks like ~15-19px here)
@@ -20,6 +21,7 @@ def main():
         plt.show()
     except FileNotFoundError:
         print("Error: 'your_image.jpg' not found. Please provide a valid image path.")
+
 
 if __name__ == "__main__":
     main()

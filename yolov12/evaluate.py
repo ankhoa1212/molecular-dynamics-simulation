@@ -51,7 +51,9 @@ def evaluate_yolov12(weights, data, img_size=640, conf_thres=0.001, iou_thres=0.
     # Compute metrics
     stats = [np.concatenate(x, 0) for x in zip(*stats)]
     if len(stats) and stats[0].any():
-        precision, recall, avg_precision, f1_score, ap_class = ap_per_class(*stats, plot=False, save_dir=None)
+        precision, recall, avg_precision, f1_score, ap_class = ap_per_class(
+            *stats, plot=False, save_dir=None
+        )
         print(
             f"Precision: {precision.mean():.4f}, Recall: {recall.mean():.4f}, mAP@0.5: {avg_precision[:, 0].mean():.4f}, mAP@0.5:0.95: {avg_precision.mean():.4f}"
         )

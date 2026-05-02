@@ -12,7 +12,9 @@ IMAGES_EXT = (".jpg", ".jpeg", ".png")
 # YOLO format: data/images and data/labels directories exist and contain files
 # Check if data directory is already split into train, test, or validation directories
 SPLIT_DIRS = ["train", "test", "validation"]
-FOUND_SPLIT = any(os.path.isdir(os.path.join(DATA_DIR, split_dir_name)) for split_dir_name in SPLIT_DIRS)
+FOUND_SPLIT = any(
+    os.path.isdir(os.path.join(DATA_DIR, split_dir_name)) for split_dir_name in SPLIT_DIRS
+)
 
 if FOUND_SPLIT:
     print("Data directory already contains train/test/validation splits. No processing needed.")
@@ -51,7 +53,9 @@ def copy_files(img_list, split_name):
         base = os.path.splitext(os.path.basename(img_path))[0]
         label_path = os.path.join(DATA_DIR, base + ".txt")
         # Copy image
-        shutil.copy(img_path, os.path.join(OUTPUT_DIR, split_name, "images", os.path.basename(img_path)))
+        shutil.copy(
+            img_path, os.path.join(OUTPUT_DIR, split_name, "images", os.path.basename(img_path))
+        )
         # Copy label if exists
         if os.path.exists(label_path):
             shutil.copy(label_path, os.path.join(OUTPUT_DIR, split_name, "labels", base + ".txt"))

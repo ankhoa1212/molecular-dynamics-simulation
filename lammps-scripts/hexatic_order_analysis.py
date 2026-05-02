@@ -57,7 +57,9 @@ def parse_and_calc_hexatic(filename, verbose=1):
 
         # Calculate Hexatic Order
         hexatic_order_calculator = freud.order.Hexatic(k=6)
-        hexatic_order_calculator.compute(system=(current_box, positions), neighbors={"num_neighbors": 6})
+        hexatic_order_calculator.compute(
+            system=(current_box, positions), neighbors={"num_neighbors": 6}
+        )
 
         # Magnitude of psi6 for each atom
         mag_psi6 = np.abs(hexatic_order_calculator.particle_order)

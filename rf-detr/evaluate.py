@@ -2,12 +2,12 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
-import supervision as sv
-import yaml
-from PIL import Image
-from supervision.metrics import ConfusionMatrix, MeanAveragePrecision
 import mlflow
+import numpy as np
+from PIL import Image
+import supervision as sv
+from supervision.metrics import ConfusionMatrix, MeanAveragePrecision
+import yaml
 
 from dataset import split_by_experiment
 from mlflow_utils import end_run, start_run

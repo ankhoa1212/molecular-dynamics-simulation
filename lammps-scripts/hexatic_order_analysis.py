@@ -70,7 +70,7 @@ def parse_and_calc_hexatic(filename, verbose=1):
     return steps, psi6_means
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Compute hexatic order from a LAMMPS dump file.")
     parser.add_argument(
         "filename", nargs="?", default="dump.lammps", help="Path to LAMMPS dump file"
@@ -86,3 +86,7 @@ if __name__ == "__main__":
     plt.title("Hexatic Order over Time")
     plt.grid(True)
     plt.show()
+
+
+if __name__ == "__main__":
+    main()

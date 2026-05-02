@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from yolov12.models.experimental import attempt_load
 from yolov12.utils.datasets import LoadImagesAndLabels
 from yolov12.utils.general import non_max_suppression, scale_coords
@@ -28,12 +29,12 @@ def evaluate_yolov12(weights, data, img_size=640, conf_thres=0.001, iou_thres=0.
             pred = non_max_suppression(pred, conf_thres, iou_thres)
 
         # Statistics per image
-        for si, det in enumerate(pred):
-            labels = targets[si][:, 1:] if len(targets) else []
-            nl = len(labels)
-            tcls = labels[:, 0].tolist() if nl else []
+        for image_index, det in enumerate(pred):
+            labels = targets[image_index][:, 1:] if len(targets) else []
+            num_labels = len(labels)
+            tcls = labels[:, 0].tolist() if num_labels else []
             if det is not None and len(det):
-                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], shapes[si][0]).round()
+                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], shapes[image_index][0]).round()
                 correct = torch.zeros(det.shape[0], iouv.numel(), dtype=torch.bool, device=device)
                 # TODO: implement matching logic for correct detections
             else:
@@ -50,9 +51,9 @@ def evaluate_yolov12(weights, data, img_size=640, conf_thres=0.001, iou_thres=0.
     # Compute metrics
     stats = [np.concatenate(x, 0) for x in zip(*stats)]
     if len(stats) and stats[0].any():
-        p, r, ap, f1, ap_class = ap_per_class(*stats, plot=False, save_dir=None)
+        p, r, avg_precision, f1_score, ap_class = ap_per_class(*stats, plot=False, save_dir=None)
         print(
-            f"Precision: {p.mean():.4f}, Recall: {r.mean():.4f}, mAP@0.5: {ap[:, 0].mean():.4f}, mAP@0.5:0.95: {ap.mean():.4f}"
+            f"Precision: {p.mean():.4f}, Recall: {r.mean():.4f}, mAP@0.5: {avg_precision[:, 0].mean():.4f}, mAP@0.5:0.95: {avg_precision.mean():.4f}"
         )
     else:
         print("No detections.")

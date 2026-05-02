@@ -601,9 +601,9 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         if img.mode == "P":
             img = img.convert("RGBA")
         if img.mode == "RGBA":
-            bg = Image.new("RGB", img.size, (30, 30, 30))
-            bg.paste(img, mask=img.split()[3])
-            img = bg
+            background = Image.new("RGB", img.size, (30, 30, 30))
+            background.paste(img, mask=img.split()[3])
+            img = background
         elif img.mode == "L":
             img = img.convert("RGB")
 

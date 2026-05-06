@@ -103,7 +103,7 @@ Training progress and metrics are printed to stdout.
 ## Viewing Results
 
 ```bash
-uv run mlflow ui
+uv run mlflow ui --backend-store-uri sqlite:///../data-setup/mlflow.db
 ```
 
 Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser to view all runs, compare metrics across experiments, and download artifacts.

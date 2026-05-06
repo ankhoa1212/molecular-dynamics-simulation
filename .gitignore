@@ -6,6 +6,8 @@ output/
 data/
 **/__pycache__/
 __pycache__/
+*.log
+*.lammpstrj
 
 # rf-detr
 rf-detr/mlruns/

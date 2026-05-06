@@ -27,14 +27,25 @@ pip install -r requirements.txt
 
 ---
 
-## Recommended Workflow: Crop → Train → Label
+## Recommended Workflow: Extract → Crop → Train → Label
 
-### 1. Create Crops for Autolabeler
+### 1. Extract Frames from TIFF
+LodeSTAR training and manual cropping work best with individual image files. Convert your raw TIFF stacks into PNG frames first:
 
-Use `crop_tool.py` to open a frame and manually draw bounding boxes around representative particles.
-Crops are saved to a `crops/` subdirectory inside the frame folder.
+```bash
+python extract_frames.py video.tif frames/ --nth 5
+```
+This will save every 5th frame into the `frames/` directory.
 
-### 2. Train Autolabeler
+### 2. Create Crops for Training
+Use `crop_tool.py` to open your extracted PNG frames and draw bounding boxes around representative particles.
+
+```bash
+python crop_tool.py frames/
+```
+Crops are saved to a `crops/` subdirectory inside the frame folder. These will be used for training.
+
+### 3. Train Autolabeler
 
 ```bash
 python train_lodestar.py \
@@ -51,34 +62,49 @@ python train_lodestar.py \
   --model-path models/exp1.pt
 ```
 
-Saves two files:
-- `models/exp1.pt` — model weights
-- `models/exp1.json` — architecture config (read automatically by `label_images.py`)
+Saves a model directory containing:
+- `models/exp1/model.pt` — model weights
+- `models/exp1/model.json` — architecture config + training parameters (see below)
+- `models/exp1/crops/` — a copy of the source images used to train this model
 
 If `--model-path` is omitted, the model is saved as `lodestar_model.pt` in `models/`.
 If that name exists, a suffix is appended automatically (`lodestar_model_1.pt`, …) to avoid overwriting.
 
+Example `model.json`:
+```json
+{
+  "n_transforms": 8,
+  "num_outputs": 3,
+  "training_params": {
+    "epochs": 100,
+    "batch_size": 8,
+    "seed": 42,
+    "source_crops": ["/path/to/frame1_crop.png", "..."]
+  }
+}
+```
+
 Training uses early stopping and is logged to MLflow automatically (see [MLflow](#mlflow) below).
 
-### 3. Label Images (to test out autolabeller model before using it for mass-autolabelling)
+### 4. Label Images (Test Inference)
 
 ```bash
 python label_images.py \
   --input-dir frames/ \
-  --model-path models/exp1.pt \
+  --model-path models/exp1/ \
   --output-dir labels/
 ```
 
 Writes one `.txt` YOLO label file per input image.
 
 
-### 4. Run Autolabeler
+### 5. Run Autolabeler (Production)
 
 To batch-label a folder of PNG frames using a trained model, run:
 
 ```bash
 python lodestar_autolabeler.py \
-  --model models/lodestar_model_10.pt \
+  --model models/lodestar_model_10/ \
   --input "/folder/path/of/tif/file" \
   --use-radius \
   --alpha 0.9 --cutoff 0.001 \
@@ -140,7 +166,7 @@ Either `--input` (TIFF search) or `--png-frames` must be provided.
 
 | Argument | Default | Description |
 |---|---|---|
-| `--model` | **required** | Path to saved `.pt` weights |
+| `--model` | **required** | Path to saved LodeSTAR model folder (or .pt file) |
 | `--input` | — | Root directory to search for `.tif`/`.tiff` files recursively |
 | `--png-frames` | — | Directory of PNG frames to label (alternative to `--input`) |
 | `--output-dir` | `<name>_dataset/labels/` | Directory to write YOLO label files and overlays. For TIFF mode, each TIFF gets a sub-folder. |
@@ -154,12 +180,13 @@ Either `--input` (TIFF search) or `--png-frames` must be provided.
 | `--min-box-size` | `0` | Minimum box size in pixels when `--use-radius` is active |
 | `--detect-batch-size` | `4` | Frames per GPU batch |
 | `--plot` | off | Save `*_overlay.png` with detections drawn |
+| `--config` | — | Path to a JSON configuration file |
 
 **Label TIFF stacks:**
 
 ```bash
 python lodestar_autolabeler.py \
-  --model models/exp1.pt \
+  --model models/exp1/ \
   --input data/raw_tiffs/ \
   --nth 5 \
   --cutoff 0.4 \
@@ -172,7 +199,7 @@ python lodestar_autolabeler.py \
 
 ```bash
 python lodestar_autolabeler.py \
-  --model models/exp1.pt \
+  --model models/exp1/ \
   --png-frames data/frames/ \
   --output-dir /mnt/results/labels \
   --use-radius --radius-scale 2.0 \
@@ -180,6 +207,31 @@ python lodestar_autolabeler.py \
   --nms-distance 35 \
   --plot
 ```
+
+**Using a configuration file:**
+
+Instead of writing out long commands, you can use a JSON file:
+
+```bash
+python lodestar_autolabeler.py --config configs/autolabel_2um.json
+```
+
+Example `configs/autolabel_2um.json`:
+```json
+{
+    "model": "models/lodestar_model_10/",
+    "input": "/path/to/your/video.tif",
+    "use_radius": true,
+    "alpha": 0.9,
+    "cutoff": 0.001,
+    "nms_distance": 35,
+    "output_dir": "output_dataset/",
+    "plot": true,
+    "detect_batch_size": 4
+}
+```
+
+> **Tip:** CLI arguments override JSON values. For example, `python lodestar_autolabeler.py --config configs/autolabel_2um.json --nth 1` will use all settings from the JSON but process every frame.
 
 ---
 
@@ -215,6 +267,61 @@ Run once with `--plot` to inspect the overlay and calibrate `--radius-scale`.
 
 ---
 
+## Manual Verification & Correction
+
+You can use the `crop_tool.py` to inspect and correct the autolabeler's output. 
+
+**Using a configuration file:**
+If you have an autolabeler config, you can use it to automatically open the generated images:
+```bash
+python crop_tool.py --config configs/autolabel_2um.json
+```
+This will automatically open the `images/` folder inside your specified `output_dir`.
+
+**Manual Folder Mode:**
+```bash
+python crop_tool.py path/to/your/images_dataset/images
+```
+
+**Advanced Controls:**
+*   **Edit Mode (E)**: Toggle to select and modify existing boxes.
+*   **Multi-Select**: Hold **Control** while clicking to select multiple boxes.
+*   **Batch Move**: Dragging any selected box moves the entire selection.
+*   **Bulk Actions**: `Delete` and `Convert` (T) work on all selected boxes at once.
+
+---
+
+## Blur Detection
+
+Before labeling or training, you can check for blurry frames using the `check_blur.py` utility. This uses the Variance of Laplacian method.
+
+```bash
+# Analyze a video, check every 5th frame, and save the best/worst frames
+python check_blur.py --input video.tif --threshold 100 --nth 5 --plot --save-samples
+```
+
+*   **Higher Score**: Sharper image (more edge detail).
+*   **Lower Score**: Blurrier image.
+*   **Handling Variable Particle Counts**: 
+    *   If the score increases over time, it usually means more particles are entering the frame.
+    *   If the score **drops suddenly**, it usually indicates a loss of focus.
+*   **Manual Inspection**: Use `--save-samples` to automatically export the **sharpest** frame, the **blurriest** frame, and any frames following a **sudden drop** in quality. This helps you quickly verify if a low score is due to blur or just a lack of particles.
+*   **Dealing with Sparse Data**: If your image is mostly empty space with only a few particles, use `--grid` (default 4). This divides the image into a 4x4 grid and returns the **maximum** sharpness found in any tile. This ensures that even a single sharp particle will "save" the frame from being marked blurry.
+    - `--grid 4`: Standard for most sparse microscopy.
+    - `--grid 1`: Check the whole image at once (original behavior).
+*   **Dealing with Noise**: If your "sharpest" frame still looks blurry, use `--blur-size` (default 3) to kill grain.
+*   **Dealing with Drift (Particle Count Change)**: If your score rises over time because more particles appear, use `--window-size` (default 50). The plot will now show a **Moving Median** line. A sharp drop below this trend line is a much better indicator of blur than a fixed threshold.
+*   **Selecting the Best Data**: Use `--top-in-window` to automatically identify **Local Peaks** (the sharpest frames in every window). The plot will mark these with yellow dots, and they are the "Gold Standard" frames for your dataset.
+*   **Training a Tracker**: If you are training a **deep-learning-based tracker**, use `--save-sequences N` (e.g., `-s 20`). This will save a continuous 20-frame burst around every local peak found. This gives the model the temporal continuity it needs to learn how to track particles across frames.
+*   **Visual Analysis**: The `--plot` flag generates a `blur_analysis_*.png` file.
+    - **Raw Sharpness** (Grey): The frame-by-frame score.
+    - **Moving Median** (Green): The trend line (filters out the "particle count" drift).
+    - **Local Peaks** (Yellow Dots): The most in-focus frames in each neighborhood.
+*   **Optional Threshold**: You can run the script without a threshold (`-t`) to perform exploratory analysis. It will still generate plots and samples, allowing you to see your typical score range before deciding on a cutoff.
+*   **Calibration**: Thresholds vary by experiment. Run it once without a threshold, check the plot, and then set your `--threshold` to filter out the "valleys" in the graph.
+
+---
+
 ## MLflow
 
 Training runs are automatically tracked with MLflow.
@@ -235,7 +342,7 @@ To track runs remotely:
 ```bash
 python train_lodestar.py \
   --input-dir frames/ \
-  --model-path models/exp1.pt \
+  --model-path models/exp1/ \
   --mlflow-uri http://my-mlflow-server:5000 \
   --experiment particle-detection \
   --run-name trial-1
@@ -265,3 +372,4 @@ always `0` (single particle class).
 - On large microscopy frames (2048px+), inference is GPU-accelerated but peak-finding runs on CPU — this is normal. If it seems slow, lower `--detect-batch-size` to `1`.
 - GPU OOM: reduce `--detect-batch-size`. The script falls back to CPU automatically if needed.
 - Early stopping fires around epoch 30–50 for typical crop sets; `--epochs 100` is a safe cap.
+

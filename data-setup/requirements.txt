@@ -9,3 +9,5 @@ deeplay  # autolabeling
 deeptrack  # autolabeling
 lightning[extra]  # autolabeling
 mlflow  # experiment tracking
+tqdm
+matplotlib

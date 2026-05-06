@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import random
+import shutil
 
 import numpy as np
 import torch
@@ -67,13 +68,14 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Train a LodeSTAR model and save it for later inference."
     )
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument(
         "--input-dir", type=str, nargs="+", help="One or more directories containing input images."
     )
     group.add_argument(
         "--input-file", type=str, nargs="+", help="One or more paths to individual input images."
     )
+    parser.add_argument("--config", "-c", type=str, help="Path to a JSON configuration file.")
     parser.add_argument(
         "--model-path",
         type=str,
@@ -154,6 +156,60 @@ def parse_args():
             "Defaults to 1024 for ≤5 crops, 512 for ≤20, 256 otherwise."
         ),
     )
+    parser.add_argument(
+        "--brightness",
+        type=float,
+        nargs=2,
+        default=(-0.05, 0.05),
+        help="Brightness range (offset) for augmentation.",
+    )
+    parser.add_argument(
+        "--contrast",
+        type=float,
+        nargs=2,
+        default=(0.25, 1.0),
+        help="Contrast range (multiplier) for augmentation.",
+    )
+    parser.add_argument(
+        "--noise",
+        type=float,
+        nargs=2,
+        default=(0.001, 0.01),
+        help="Gaussian noise range (sigma) for augmentation.",
+    )
+    parser.add_argument(
+        "--rotation",
+        type=float,
+        nargs=2,
+        default=(0.0, 2 * np.pi),
+        help="Rotation range in radians.",
+    )
+    parser.add_argument(
+        "--scale",
+        type=float,
+        nargs=2,
+        default=(0.8, 1.2),
+        help="Scale jitter range.",
+    )
+    parser.add_argument(
+        "--translate",
+        type=float,
+        nargs=2,
+        default=(-0.1, 0.1),
+        help="Translation range (as fraction of image size).",
+    )
+    parser.add_argument(
+        "--flip-lr",
+        type=float,
+        default=0.5,
+        help="Probability of left-right flip.",
+    )
+    parser.add_argument(
+        "--flip-ud",
+        type=float,
+        default=0.5,
+        help="Probability of up-down flip.",
+    )
     return parser.parse_args()
 
 
@@ -183,25 +239,23 @@ def _load_crops(image_files, crop_size=64):
     return crops
 
 
-def _make_pipeline(crop_array):
+def _make_pipeline(crop_array, args):
     channel_crop = np.expand_dims(crop_array, axis=-1)  # (H, W, 1)
     return (
         dt.Value(channel_crop)
-        # Wider intensity range to cover dim/bright particle variation
-        >> dt.Multiply(lambda: np.random.uniform(0.4, 1.6))
-        >> dt.Add(lambda: np.random.uniform(-0.15, 0.15))
-        # Rotation + scale jitter + small translation for tighter centering
+        >> dt.Multiply(lambda: np.random.uniform(*args.contrast))
+        >> dt.Add(lambda: np.random.uniform(*args.brightness))
         >> dt.Affine(
-            rotation=lambda: np.random.uniform(0, 2 * np.pi),
-            scale=lambda: np.random.uniform(0.8, 1.2),
-            translate=lambda: (np.random.uniform(-0.1, 0.1), np.random.uniform(-0.1, 0.1)),
+            rotation=lambda: np.random.uniform(*args.rotation),
+            scale=lambda: np.random.uniform(*args.scale),
+            translate=lambda: (
+                np.random.uniform(*args.translate),
+                np.random.uniform(*args.translate),
+            ),
         )
-        >> dt.FlipLR(p=0.5)
-        >> dt.FlipUD(p=0.5)
-        # Defocus blur variation
-        >> dt.Gaussian(sigma=lambda: np.random.uniform(0, 2.0))
-        # Shot noise (Poisson) — fundamental to optical microscopy
-        >> dt.Poisson(snr=lambda: np.random.uniform(3, 20))
+        >> dt.FlipLR(p=args.flip_lr)
+        >> dt.FlipUD(p=args.flip_ud)
+        >> dt.Gaussian(sigma=lambda: np.random.uniform(*args.noise))
         >> dt.MoveAxis(-1, 0)
         >> dt.pytorch.ToTensor(dtype=torch.float32)
     )
@@ -209,13 +263,20 @@ def _make_pipeline(crop_array):
 
 def _unique_model_path(path):
     """Return path unchanged if it doesn't exist; otherwise append _1, _2, … until free."""
-    if not os.path.exists(path):
-        return path
+    # We want to check if either the file exists OR the folder (without .pt) exists
     stem, ext = os.path.splitext(path)
+
+    def exists_any(p):
+        s, _ = os.path.splitext(p)
+        return os.path.exists(p) or os.path.isdir(s)
+
+    if not exists_any(path):
+        return path
+
     counter = 1
     while True:
         candidate = f"{stem}_{counter}{ext}"
-        if not os.path.exists(candidate):
+        if not exists_any(candidate):
             return candidate
         counter += 1
 
@@ -231,7 +292,11 @@ def _build_and_train(args, crops_data):
     ).build()
 
     datasets = [
-        dt.pytorch.Dataset(_make_pipeline(crop), length=args.dataset_length, replace=True)
+        dt.pytorch.Dataset(
+            _make_pipeline(crop, args),
+            length=args.dataset_length,
+            replace=True,
+        )
         for crop in crops_data
     ]
     dataloader = dl.DataLoader(
@@ -273,6 +338,49 @@ def _build_and_train(args, crops_data):
 def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """Main execution block for LodeSTAR training."""
     args = parse_args()
+
+    # Load from config if provided
+    if args.config:
+        with open(args.config, "r", encoding="utf-8") as f:
+            config_data = json.load(f)
+
+        # Map config keys to internal args automatically
+        # Support both flat and nested (training_params) structures
+        def apply_config(data):
+            for key, value in data.items():
+                if hasattr(args, key):
+                    setattr(args, key, value)
+                elif key == "model":  # special case for legacy configs
+                    args.model_path = value
+                elif key == "flip_lr":
+                    args.flip_lr = value
+                elif key == "flip_ud":
+                    args.flip_ud = value
+
+        apply_config(config_data)
+        if "training_params" in config_data:
+            apply_config(config_data["training_params"])
+
+        # If input is not on CLI, check config
+        if not args.input_dir and not args.input_file:
+            tp = config_data.get("training_params", {})
+            if "source_crops" in tp:
+                args.input_file = tp["source_crops"]
+            elif "source_crops" in config_data:
+                args.input_file = config_data["source_crops"]
+            elif "output_dir" in config_data:
+                # Typically we train on crops in output_dir/crops/
+                crops_sub = os.path.join(config_data["output_dir"], "crops")
+                if os.path.isdir(crops_sub):
+                    args.input_dir = [crops_sub]
+                else:
+                    args.input_dir = [config_data["output_dir"]]
+
+    if not args.input_dir and not args.input_file:
+        print(
+            "Error: No input source provided. Use --input-dir, --input-file, or a valid --config."
+        )
+        return
 
     if args.model_path is None:
         models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
@@ -372,25 +480,79 @@ def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statem
                 "patience": args.patience,
                 "min_delta": args.min_delta,
                 "dataset_length": args.dataset_length,
+                "aug_brightness": args.brightness,
+                "aug_contrast": args.contrast,
+                "aug_noise": args.noise,
+                "aug_rotation": args.rotation,
+                "aug_scale": args.scale,
+                "aug_translate": args.translate,
+                "aug_flip_lr": args.flip_lr,
+                "aug_flip_ud": args.flip_ud,
             }
         )
 
         crops_data = _load_crops(crop_files, crop_size=args.crop_size)
         lodestar = _build_and_train(args, crops_data)
 
+        # Derive model directory from the provided path
+        # If user gave "models/my_model.pt", we want directory "models/my_model/"
+        # If user gave "models/my_model", we want directory "models/my_model/"
+        if args.model_path.endswith(".pt"):
+            model_dir = os.path.splitext(args.model_path)[0]
+        else:
+            model_dir = args.model_path
+
+        os.makedirs(model_dir, exist_ok=True)
+
+        final_weights_path = os.path.join(model_dir, "model.pt")
+        final_config_path = os.path.join(model_dir, "model.json")
+
         # Save weights
-        torch.save(lodestar.state_dict(), args.model_path)
-        print(f"Model saved to {args.model_path}")
+        torch.save(lodestar.state_dict(), final_weights_path)
+        print(f"Model weights saved to {final_weights_path}")
 
-        # Save companion JSON so label_images.py can reconstruct the architecture
-        config = {"n_transforms": args.n_transforms, "num_outputs": args.num_outputs}
-        config_path = os.path.splitext(args.model_path)[0] + ".json"
-        with open(config_path, "w", encoding="utf-8") as config_file:
+        # Save companion JSON
+        config = {
+            "n_transforms": args.n_transforms,
+            "num_outputs": args.num_outputs,
+            "training_params": {
+                "epochs": args.epochs,
+                "batch_size": args.batch_size,
+                "crop_size": args.crop_size,
+                "seed": args.seed,
+                "patience": args.patience,
+                "min_delta": args.min_delta,
+                "dataset_length": args.dataset_length,
+                "brightness": args.brightness,
+                "contrast": args.contrast,
+                "noise": args.noise,
+                "rotation": args.rotation,
+                "scale": args.scale,
+                "translate": args.translate,
+                "flip_lr": args.flip_lr,
+                "flip_ud": args.flip_ud,
+                "source_crops": crop_files,
+            },
+        }
+        with open(final_config_path, "w", encoding="utf-8") as config_file:
             json.dump(config, config_file, indent=2)
-        print(f"Config saved to {config_path}")
+        print(f"Model config saved to {final_config_path}")
 
-        mlflow.log_artifact(args.model_path)
-        mlflow.log_artifact(config_path)
+        # Copy source crops into the model directory
+        final_crops_dir = os.path.join(model_dir, "crops")
+        os.makedirs(final_crops_dir, exist_ok=True)
+        print(f"Copying {len(crop_files)} training crops to {final_crops_dir}...")
+        for i, src_path in enumerate(crop_files):
+            # Preserve original filename but handle potential duplicates
+            fname = os.path.basename(src_path)
+            dst_path = os.path.join(final_crops_dir, fname)
+            if os.path.exists(dst_path):
+                dst_path = os.path.join(final_crops_dir, f"{i}_{fname}")
+            shutil.copy2(src_path, dst_path)
+
+        mlflow.log_artifact(final_weights_path)
+        mlflow.log_artifact(final_config_path)
+        mlflow.log_artifacts(final_crops_dir, artifact_path="crops")
         print(f"MLflow run '{run_name}' logged to experiment '{args.experiment}'.")
 
 

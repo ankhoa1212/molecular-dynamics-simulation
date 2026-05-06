@@ -130,7 +130,16 @@ def _collect_image_files(args):
 
 def _load_model(args):
     """Load the saved LodeSTAR model, reading architecture from companion JSON."""
-    config_path = os.path.splitext(args.model_path)[0] + ".json"
+    weights_path = args.model_path
+
+    # If path is a directory, look for model.pt and model.json inside
+    if os.path.isdir(weights_path):
+        config_path = os.path.join(weights_path, "model.json")
+        weights_path = os.path.join(weights_path, "model.pt")
+    else:
+        # Legacy: assume companion JSON next to .pt file
+        config_path = os.path.splitext(weights_path)[0] + ".json"
+
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as config_file:
             config = json.load(config_file)
@@ -147,12 +156,15 @@ def _load_model(args):
         num_outputs = 3
         args.num_outputs = num_outputs
 
+    if not os.path.exists(weights_path):
+        raise FileNotFoundError(f"Weights file not found at {weights_path}")
+
     lodestar = dl.LodeSTAR(
         n_transforms=n_transforms, num_outputs=num_outputs, optimizer=dl.Adam(lr=1e-3)
     ).build()
-    lodestar.load_state_dict(torch.load(args.model_path, map_location="cpu"))
+    lodestar.load_state_dict(torch.load(weights_path, map_location="cpu"))
     lodestar.eval()
-    print(f"Model loaded from {args.model_path}")
+    print(f"Model loaded from {weights_path}")
     return lodestar
 
 

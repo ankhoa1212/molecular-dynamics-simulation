@@ -1,0 +1,12 @@
+{
+    "model": "models/lodestar_model_10.pt",
+    "input": "/mnt/d/Particle Tracking Data/2um/CODE DATA FOR 2um/2 um Lower Concentration/5 ul Au Citrate + 2.5 ul 1% of 2ul + 2.5 ul pf NaCl Trial 1 20% Light Intensity_2_MMStack_Default.ome.tif",
+    "use_radius": true,
+    "alpha": 0.9,
+    "cutoff": 0.001,
+    "nms_distance": 35,
+    "output_dir": "/mnt/d/Particle Tracking Data/2um Labelled Updated",
+    "plot": true,
+    "detect_batch_size": 4,
+    "num_workers": 4
+}

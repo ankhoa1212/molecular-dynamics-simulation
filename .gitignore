@@ -8,6 +8,9 @@ data/
 __pycache__/
 *.log
 *.lammpstrj
+**/yolo_dataset/
+*.tif
+*.tiff
 
 # rf-detr
 rf-detr/mlruns/

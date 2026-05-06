@@ -1,0 +1,46 @@
+{
+  "n_transforms": 8,
+  "num_outputs": 3,
+  "training_params": {
+    "epochs": 100,
+    "batch_size": 8,
+    "crop_size": 64,
+    "seed": 42,
+    "patience": 15,
+    "min_delta": 0.005,
+    "dataset_length": 1024,
+    "brightness": [
+      -0.05,
+      0.05
+    ],
+    "contrast": [
+      0.25,
+      1.0
+    ],
+    "noise": [
+      0.001,
+      0.01
+    ],
+    "rotation": [
+      0,
+      6.283185307179586
+    ],
+    "scale": [
+      0.8,
+      1.2
+    ],
+    "translate": [
+      -0.1,
+      0.1
+    ],
+    "flip_lr": 0.5,
+    "flip_ud": 0.5,
+    "source_crops": [
+      "/home/ankhoa1212/git/molecular-dynamics-simulation/data-setup/models/lodestar_model_14/crops/crop_frame_00000_y0190_x0436.png",
+      "/home/ankhoa1212/git/molecular-dynamics-simulation/data-setup/models/lodestar_model_14/crops/crop_frame_00000_y0393_x0527.png",
+      "/home/ankhoa1212/git/molecular-dynamics-simulation/data-setup/models/lodestar_model_14/crops/crop_frame_00000_y1258_x2213.png",
+      "/home/ankhoa1212/git/molecular-dynamics-simulation/data-setup/models/lodestar_model_14/crops/crop_frame_00000_y1479_x0358.png",
+      "/home/ankhoa1212/git/molecular-dynamics-simulation/data-setup/models/lodestar_model_14/crops/crop_frame_00000_y1943_x2863.png"
+    ]
+  }
+}

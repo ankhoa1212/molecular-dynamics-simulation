@@ -74,6 +74,8 @@ training:
   batch_size: 4
   grad_accum_steps: 4             # effective batch = batch_size * grad_accum_steps
   learning_rate: 1.0e-4
+  num_workers: 4                   # number of data loading workers
+  pin_memory: true                # speeds up data transfer to GPU
   checkpoint_dir: checkpoints     # where model weights are saved
 
 mlflow:
@@ -117,13 +119,13 @@ Evaluate on the test split after training. You can either:
 **Option A — use the most recent local checkpoint:**
 
 ```bash
-uv run python evaluate.py --config config.yaml
+uv run python evaluate.py --config config.yaml --batch-size 16
 ```
 
 **Option B — load a checkpoint from a specific MLflow run and log metrics back to it:**
 
 ```bash
-uv run python evaluate.py --config config.yaml --run-id <run-id>
+uv run python evaluate.py --config config.yaml --run-id <run-id> --batch-size 16
 ```
 
 The run ID is visible in the MLflow UI or in the training output. This option downloads the checkpoint artifact from MLflow and logs the evaluation metrics (`test/mAP50`, `test/mAP50_95`, `test/precision`, `test/recall`) back to the same run for side-by-side comparison.

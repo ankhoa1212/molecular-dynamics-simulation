@@ -192,7 +192,7 @@ def _detect_batch(batch_norm, ctx):
     use_fp16 = ctx.args.fp16 and ctx.device == "cuda"
 
     with torch.inference_mode():
-        with torch.cuda.amp.autocast(enabled=use_fp16):
+        with torch.amp.autocast("cuda", enabled=use_fp16):
             try:
                 detections = ctx.model.detect(
                     batch_norm,

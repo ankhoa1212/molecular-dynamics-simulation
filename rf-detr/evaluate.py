@@ -51,6 +51,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate RF-DETR particle detector")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument(
+        "--batch-size", type=int, default=4, help="Inference batch size for evaluation"
+    )
+    parser.add_argument(
         "--run-id", default=None, help="MLflow run ID to load checkpoint from and log metrics to"
     )
     args = parser.parse_args()
@@ -80,24 +83,35 @@ def main() -> None:
     all_predictions: list[sv.Detections] = []
     all_targets: list[sv.Detections] = []
 
-    for image_info in coco["images"]:
-        img_path = splits.test_dir / image_info["file_name"]
-        image = np.array(Image.open(img_path).convert("RGB"))
+    images_info = coco["images"]
+    for i in tqdm(range(0, len(images_info), args.batch_size), desc="Evaluating batches"):
+        batch_info = images_info[i : i + args.batch_size]
+        batch_images = []
+        for info in batch_info:
+            img_path = splits.test_dir / info["file_name"]
+            image = np.array(Image.open(img_path).convert("RGB"))
+            batch_images.append(image)
 
-        detections = model.predict(image, threshold=0.5)
-        all_predictions.append(detections)
+            annotations = image_id_to_anns.get(info["id"], [])
+            if annotations:
+                # COCO bbox is [x, y, w, h]; convert to xyxy
+                boxes = np.array(
+                    [annotation["bbox"] for annotation in annotations], dtype=np.float32
+                )
+                boxes[:, 2] += boxes[:, 0]
+                boxes[:, 3] += boxes[:, 1]
+                class_ids = np.array([annotation["category_id"] - 1 for annotation in annotations])
+                ground_truth = sv.Detections(xyxy=boxes, class_id=class_ids)
+            else:
+                ground_truth = sv.Detections.empty()
+            all_targets.append(ground_truth)
 
-        annotations = image_id_to_anns.get(image_info["id"], [])
-        if annotations:
-            # COCO bbox is [x, y, w, h]; convert to xyxy
-            boxes = np.array([annotation["bbox"] for annotation in annotations], dtype=np.float32)
-            boxes[:, 2] += boxes[:, 0]
-            boxes[:, 3] += boxes[:, 1]
-            class_ids = np.array([annotation["category_id"] - 1 for annotation in annotations])
-            ground_truth = sv.Detections(xyxy=boxes, class_id=class_ids)
+        # Batch prediction
+        detections_list = model.predict(batch_images, threshold=0.5)
+        if isinstance(detections_list, list):
+            all_predictions.extend(detections_list)
         else:
-            ground_truth = sv.Detections.empty()
-        all_targets.append(ground_truth)
+            all_predictions.append(detections_list)
 
     map_metric = MeanAveragePrecision()
     map_metric.update(all_predictions, all_targets)

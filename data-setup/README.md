@@ -12,6 +12,7 @@ Detects particles in microscopy images and outputs YOLO-format `.txt` label file
 | `train_lodestar.py` | Train a LodeSTAR model on crops and save it for reuse |
 | `label_images.py` | Run inference with a saved model to produce YOLO labels |
 | `lodestar_autolabeler.py` | Batch label raw TIFF stacks or PNG frames with a saved model |
+| `preview_augmentations.py` | Visualize how brightness, contrast, and noise affect your training crops |
 
 For help on script usage:
 ```bash
@@ -291,59 +292,31 @@ python crop_tool.py path/to/your/images_dataset/images
 
 ---
 
-## Blur Detection
-
-Before labeling or training, you can check for blurry frames using the `check_blur.py` utility. This uses the Variance of Laplacian method.
-
-```bash
-# Analyze a video, check every 5th frame, and save the best/worst frames
-python check_blur.py --input video.tif --threshold 100 --nth 5 --plot --save-samples
-```
-
-*   **Higher Score**: Sharper image (more edge detail).
-*   **Lower Score**: Blurrier image.
-*   **Handling Variable Particle Counts**: 
-    *   If the score increases over time, it usually means more particles are entering the frame.
-    *   If the score **drops suddenly**, it usually indicates a loss of focus.
-*   **Manual Inspection**: Use `--save-samples` to automatically export the **sharpest** frame, the **blurriest** frame, and any frames following a **sudden drop** in quality. This helps you quickly verify if a low score is due to blur or just a lack of particles.
-*   **Dealing with Sparse Data**: If your image is mostly empty space with only a few particles, use `--grid` (default 4). This divides the image into a 4x4 grid and returns the **maximum** sharpness found in any tile. This ensures that even a single sharp particle will "save" the frame from being marked blurry.
-    - `--grid 4`: Standard for most sparse microscopy.
-    - `--grid 1`: Check the whole image at once (original behavior).
-*   **Dealing with Noise**: If your "sharpest" frame still looks blurry, use `--blur-size` (default 3) to kill grain.
-*   **Dealing with Drift (Particle Count Change)**: If your score rises over time because more particles appear, use `--window-size` (default 50). The plot will now show a **Moving Median** line. A sharp drop below this trend line is a much better indicator of blur than a fixed threshold.
-*   **Selecting the Best Data**: Use `--top-in-window` to automatically identify **Local Peaks** (the sharpest frames in every window). The plot will mark these with yellow dots, and they are the "Gold Standard" frames for your dataset.
-*   **Training a Tracker**: If you are training a **deep-learning-based tracker**, use `--save-sequences N` (e.g., `-s 20`). This will save a continuous 20-frame burst around every local peak found. This gives the model the temporal continuity it needs to learn how to track particles across frames.
-*   **Visual Analysis**: The `--plot` flag generates a `blur_analysis_*.png` file.
-    - **Raw Sharpness** (Grey): The frame-by-frame score.
-    - **Moving Median** (Green): The trend line (filters out the "particle count" drift).
-    - **Local Peaks** (Yellow Dots): The most in-focus frames in each neighborhood.
-*   **Optional Threshold**: You can run the script without a threshold (`-t`) to perform exploratory analysis. It will still generate plots and samples, allowing you to see your typical score range before deciding on a cutoff.
-*   **Calibration**: Thresholds vary by experiment. Run it once without a threshold, check the plot, and then set your `--threshold` to filter out the "valleys" in the graph.
-
----
-
 ## MLflow
 
-Training runs are automatically tracked with MLflow.
+Training runs are automatically tracked with MLflow to help you compare different models and augmentation settings.
 
-```bash
-# Start the UI
-mlflow ui --port 5000
-# Open http://localhost:5000
-```
+### Viewing Runs Locally
+To start the MLflow dashboard and inspect your training history:
+
+1. Navigate to the `data-setup/` directory.
+2. Run the UI:
+   ```bash
+   mlflow ui --backend-store-uri sqlite:///mlflow.db
+   ```
+3. Open [http://localhost:5000](http://localhost:5000) in your browser.
 
 Each run records:
-- **Parameters:** all training hyperparameters
-- **Metrics:** loss curves per step (logged by the Lightning trainer)
-- **Artifacts:** the saved `.pt` weights and `.json` config
+- **Parameters**: All training hyperparameters (epochs, crop size, batch size, etc.).
+- **Metrics**: Loss curves per step (logged automatically by the Lightning trainer).
+- **Artifacts**: A copy of the saved `.pt` weights, the `.json` config, and a copy of the **source crops** used for that specific run.
 
-To track runs remotely:
+To track runs locally (now defaults to `sqlite:///mlflow.db`):
 
 ```bash
 python train_lodestar.py \
   --input-dir frames/ \
   --model-path models/exp1/ \
-  --mlflow-uri http://my-mlflow-server:5000 \
   --experiment particle-detection \
   --run-name trial-1
 ```

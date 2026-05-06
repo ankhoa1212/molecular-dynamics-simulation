@@ -1,14 +1,14 @@
 dataset:
-  path: /path/to/dataset          # directory containing images/ and annotations.json
+  path: /mnt/d/Particle Tracking Data/2um-rf-detr/          # directory containing images/ and annotations.json
   train_experiments:
-    - trial1
+    - train1
   val_experiments:
-    - trial2
+    - val1
   test_experiments:
-    - trial3
+    - test1
 
 model:
-  variant: base                   # base | large
+  variant: large                   # base | large
 
 training:
   epochs: 50

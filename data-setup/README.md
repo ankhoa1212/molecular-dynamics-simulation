@@ -51,7 +51,7 @@ Crops are saved to a `crops/` subdirectory inside the frame folder. These will b
 ```bash
 python train_lodestar.py \
   --input-dir "frames/" \
-  --model-path models/exp1.pt
+  --model-path models/lodestar_model_15/
 ```
 
 Accepts one or more `--input-dir` paths. Each directory is searched directly and inside its
@@ -60,16 +60,15 @@ Accepts one or more `--input-dir` paths. Each directory is searched directly and
 ```bash
 python train_lodestar.py \
   --input-dir "trial_1_frames/" "trial_2_frames/" \
-  --model-path models/exp1.pt
+  --model-path models/lodestar_model_15/
 ```
 
 Saves a model directory containing:
-- `models/exp1/model.pt` — model weights
-- `models/exp1/model.json` — architecture config + training parameters (see below)
-- `models/exp1/crops/` — a copy of the source images used to train this model
+- `models/lodestar_model_15/model.pt` — model weights
+- `models/lodestar_model_15/model.json` — architecture config + training parameters (see below)
+- `models/lodestar_model_15/crops/` — a copy of the source images used to train this model
 
-If `--model-path` is omitted, the model is saved as `lodestar_model.pt` in `models/`.
-If that name exists, a suffix is appended automatically (`lodestar_model_1.pt`, …) to avoid overwriting.
+If `--model-path` is omitted, the model is saved as `model.pt` in a folder `lodestar_model_` + number inside `models/`.
 
 Example `model.json`:
 ```json
@@ -92,7 +91,7 @@ Training uses early stopping and is logged to MLflow automatically (see [MLflow]
 ```bash
 python label_images.py \
   --input-dir frames/ \
-  --model-path models/exp1/ \
+  --model-path models/lodestar_model_15/ \
   --output-dir labels/
 ```
 
@@ -137,7 +136,16 @@ This will label all PNG frames in the specified directory using the provided mod
 | `--seed` | `42` | Random seed for reproducibility |
 | `--experiment` | `lodestar` | MLflow experiment name |
 | `--run-name` | model filename stem | MLflow run name |
-| `--mlflow-uri` | `mlruns` | MLflow tracking URI |
+| `--mlflow-uri` | `sqlite:///mlflow.db` | MLflow tracking URI |
+| `--brightness` | `-0.05 0.05` | Brightness offset range |
+| `--contrast` | `0.25 1.0` | Contrast multiplier range |
+| `--noise` | `0.001 0.01` | Gaussian noise range (sigma) |
+| `--rotation` | `0 2π` | Rotation range (radians) |
+| `--scale` | `0.8 1.2` | Scale jitter range |
+| `--translate` | `-0.1 0.1` | Translation range (fraction of image size) |
+| `--flip-lr` | `0.5` | Probability of left-right flip |
+| `--flip-ud` | `0.5` | Probability of up-down flip |
+| `--config` | — | Path to a JSON configuration file |
 
 ### `label_images.py`
 
@@ -145,6 +153,7 @@ This will label all PNG frames in the specified directory using the provided mod
 |---|---|---|
 | `--input-dir` | — | Directory of input images |
 | `--input-file` | — | Single input image |
+| `--config` | — | Path to a JSON configuration file |
 | `--model-path` | **required** | Path to saved `.pt` weights |
 | `--output-dir` | `output_<input_folder_name>/` | Where to write YOLO `.txt` files |
 | `--alpha` | `0.5` | Blend between equivariance score (0) and detection score (1) |
@@ -182,12 +191,15 @@ Either `--input` (TIFF search) or `--png-frames` must be provided.
 | `--detect-batch-size` | `4` | Frames per GPU batch |
 | `--plot` | off | Save `*_overlay.png` with detections drawn |
 | `--config` | — | Path to a JSON configuration file |
+| `--num-workers` | `4` | DataLoader workers for prefetching |
+| `--fp16` | off | Use 16-bit mixed precision (faster on GPU) |
+| `--compile` | off | Use torch.compile for kernel optimization (PyTorch 2.0+) |
 
 **Label TIFF stacks:**
 
 ```bash
 python lodestar_autolabeler.py \
-  --model models/exp1/ \
+  --model models/lodestar_model_15/ \
   --input data/raw_tiffs/ \
   --nth 5 \
   --cutoff 0.4 \
@@ -200,7 +212,7 @@ python lodestar_autolabeler.py \
 
 ```bash
 python lodestar_autolabeler.py \
-  --model models/exp1/ \
+  --model models/lodestar_model_15/ \
   --png-frames data/frames/ \
   --output-dir /mnt/results/labels \
   --use-radius --radius-scale 2.0 \
@@ -209,30 +221,44 @@ python lodestar_autolabeler.py \
   --plot
 ```
 
-**Using a configuration file:**
+## Configuring with JSON
 
-Instead of writing out long commands, you can use a JSON file:
+Most scripts in this pipeline support a `--config` flag to simplify command-line usage. This is especially useful for maintaining reproducible training runs or specific inference settings for different experiments.
+
+### 1. Training Configuration
+You can define all hyperparameters for `train_lodestar.py` in a JSON file. This is the recommended way to manage complex augmentation ranges.
 
 ```bash
-python lodestar_autolabeler.py --config configs/autolabel_2um.json
+python train_lodestar.py --config configs/default_lodestar.json --input-dir frames/
 ```
 
-Example `configs/autolabel_2um.json`:
+Example `configs/default_lodestar.json` (partial):
 ```json
 {
-    "model": "models/lodestar_model_10/",
-    "input": "/path/to/your/video.tif",
-    "use_radius": true,
-    "alpha": 0.9,
-    "cutoff": 0.001,
-    "nms_distance": 35,
-    "output_dir": "output_dataset/",
-    "plot": true,
-    "detect_batch_size": 4
+  "n_transforms": 8,
+  "num_outputs": 3,
+  "training_params": {
+    "epochs": 100,
+    "batch_size": 8,
+    "brightness": [-0.05, 0.05],
+    "contrast": [0.25, 1.0],
+    "noise": [0.001, 0.01]
+  }
 }
 ```
 
-> **Tip:** CLI arguments override JSON values. For example, `python lodestar_autolabeler.py --config configs/autolabel_2um.json --nth 1` will use all settings from the JSON but process every frame.
+### 2. Autolabeling Configuration
+For batch processing, you can save your model path and detection thresholds (`cutoff`, `alpha`, etc.) in a config file.
+
+```bash
+python lodestar_autolabeler.py --config configs/autolabel_2um_lodestar_model_15.json
+```
+
+We provide several pre-tuned configs in the `configs/` directory:
+- `configs/autolabel_2um_lodestar_model_10.json`: Optimized for Model 10 on 2um particles.
+- `configs/autolabel_2um_lodestar_model_15.json`: Optimized for Model 15 on 2um particles.
+
+> **Tip:** CLI arguments always override JSON values. For example, `python lodestar_autolabeler.py --config configs/autolabel_2um.json --cutoff 0.01` will use the JSON settings but apply a different cutoff.
 
 ---
 
@@ -284,6 +310,13 @@ This will automatically open the `images/` folder inside your specified `output_
 python crop_tool.py path/to/your/images_dataset/images
 ```
 
+### `crop_tool.py`
+
+| Argument | Default | Description |
+|---|---|---|
+| `folder` | — | Positional: folder containing images to browse |
+| `--config` | — | Path to a JSON configuration file (autolabeler config supported) |
+
 **Advanced Controls:**
 *   **Edit Mode (E)**: Toggle to select and modify existing boxes.
 *   **Multi-Select**: Hold **Control** while clicking to select multiple boxes.
@@ -300,11 +333,15 @@ Training runs are automatically tracked with MLflow to help you compare differen
 To start the MLflow dashboard and inspect your training history:
 
 1. Navigate to the `data-setup/` directory.
-2. Run the UI:
+2. Activate the virtual environment for data-setup:
+   ```bash
+   source .venv/bin/activate
+   ```
+3. Run the UI:
    ```bash
    mlflow ui --backend-store-uri sqlite:///mlflow.db
    ```
-3. Open [http://localhost:5000](http://localhost:5000) in your browser.
+4. Open [http://localhost:5000](http://localhost:5000) in your browser.
 
 Each run records:
 - **Parameters**: All training hyperparameters (epochs, crop size, batch size, etc.).
@@ -316,10 +353,28 @@ To track runs locally (now defaults to `sqlite:///mlflow.db`):
 ```bash
 python train_lodestar.py \
   --input-dir frames/ \
-  --model-path models/exp1/ \
+  --model-path models/lodestar_model_15/ \
   --experiment particle-detection \
   --run-name trial-1
 ```
+
+---
+
+## Augmentation Preview
+
+Before training, use `preview_augmentations.py` to tune your brightness, contrast, and noise settings. This script picks random particles from your crops and applies unique random augmentations to each subplot in a square-like grid.
+
+```bash
+python preview_augmentations.py models/lodestar_model_15/crops/ --count 25 --brightness -0.1 0.4 --contrast 0.1 0.5 --noise 0.01 0.03
+```
+
+| Argument | Default | Description |
+|---|---|---|
+| `--count` | `12` | Number of samples to generate in the grid |
+| `--brightness` | `-0.15 0.15` | Range for brightness offset |
+| `--contrast` | `0.4 1.6` | Range for contrast multiplier |
+| `--noise` | `0.0 0.05` | Range for Gaussian noise (sigma) |
+| `--size` | `64` | Crop size (px) |
 
 ---
 

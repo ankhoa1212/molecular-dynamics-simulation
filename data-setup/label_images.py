@@ -100,7 +100,49 @@ def parse_args():
         action="store_true",
         help="Overlay bounding boxes on the input image and save as PNG.",
     )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to a JSON configuration file containing these arguments.",
+    )
     return parser.parse_args()
+
+
+def _load_config(args):
+    """Load from config file if provided."""
+    if not args.config:
+        return args
+
+    if not os.path.exists(args.config):
+        raise FileNotFoundError(f"Config file not found: {args.config}")
+
+    with open(args.config, "r", encoding="utf-8") as f:
+        config_data = json.load(f)
+
+    # List of keys and their defaults to check for overrides
+    defaults = {
+        "box_size": 40,
+        "alpha": 0.5,
+        "cutoff": 0.5,
+        "detect_mode": "ratio",
+        "nms_distance": 0.0,
+        "radius_scale": 1.0,
+        "min_box_size": 0.0,
+        "detect_batch_size": 4,
+    }
+
+    for key, value in config_data.items():
+        current_val = getattr(args, key, None)
+        # If the current value is the default or None, overwrite it with JSON value
+        if current_val is None or (key in defaults and current_val == defaults[key]):
+            setattr(args, key, value)
+
+    # Bridge config 'model' to 'model_path' if needed
+    if "model" in config_data and not args.model_path:
+        args.model_path = config_data["model"]
+
+    return args
 
 
 def _load_and_normalise(image_files):
@@ -373,6 +415,7 @@ def _print_detection_summary(all_detections):
 def main():
     """Main entry point for running LodeSTAR YOLO labeling from the command line."""
     args = parse_args()
+    args = _load_config(args)
 
     if not args.input_dir and not args.input_file:
         raise ValueError("Either --input-dir or --input-file must be provided.")

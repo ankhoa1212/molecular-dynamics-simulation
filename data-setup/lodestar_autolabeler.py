@@ -446,6 +446,10 @@ def main():
             "nms_distance": 0.0,
             "radius_scale": 1.0,
             "min_box_size": 0.0,
+            "plot": False,
+            "use_radius": False,
+            "fp16": False,
+            "compile": False,
         }
 
         for key, value in config_data.items():

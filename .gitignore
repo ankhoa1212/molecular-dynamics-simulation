@@ -1,6 +1,7 @@
 log.lammps
 
 venv/
+.venv/
 output/
 *.csv
 data/
@@ -17,4 +18,7 @@ rf-detr/mlruns/
 rf-detr/checkpoints/
 rf-detr/*.pth
 rf-detr/split/
-rf-detr/.venv/
+
+# data-setup
+data-setup/mlruns/
+data-setup/lightning_logs/

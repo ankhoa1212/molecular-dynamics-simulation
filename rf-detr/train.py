@@ -86,6 +86,8 @@ def main() -> None:
         batch_size=train_cfg["batch_size"],
         grad_accum_steps=train_cfg["grad_accum_steps"],
         lr=train_cfg["learning_rate"],
+        num_workers=train_cfg.get("num_workers", 0),
+        pin_memory=train_cfg.get("pin_memory", False),
         output_dir=str(checkpoint_dir),
         callbacks=callbacks,
     )

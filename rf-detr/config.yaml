@@ -1,20 +1,22 @@
 dataset:
-  path: /path/to/dataset          # directory containing images/ and annotations.json
+  path: /mnt/d/Particle Tracking Data/2um-rf-detr/          # directory containing images/ and annotations.json
   train_experiments:
-    - trial1
+    - train1
   val_experiments:
-    - trial2
+    - val1
   test_experiments:
-    - trial3
+    - test1
 
 model:
-  variant: base                   # base | large
+  variant: large                   # base | large
 
 training:
   epochs: 50
   batch_size: 4
   grad_accum_steps: 4
   learning_rate: 1.0e-4
+  num_workers: 4
+  pin_memory: true
   checkpoint_dir: checkpoints
 
 mlflow:

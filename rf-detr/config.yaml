@@ -9,6 +9,7 @@ dataset:
 
 model:
   variant: large                   # base | large
+  num_queries: 1000                # max detections per frame (default 300); must retrain to change
 
 training:
   epochs: 50
@@ -18,6 +19,10 @@ training:
   num_workers: 4
   pin_memory: true
   checkpoint_dir: checkpoints
+  early_stopping: true
+  early_stopping_patience: 10    # epochs with no improvement before stopping
+  early_stopping_min_delta: 0.001  # minimum mAP improvement to reset patience
+  early_stopping_use_ema: true   # monitor EMA checkpoint mAP instead of base
 
 mlflow:
   experiment_name: rf-detr

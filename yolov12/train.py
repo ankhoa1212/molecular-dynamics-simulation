@@ -1,45 +1,84 @@
 import os
-from yolov12.ultralytics import YOLO
+from pathlib import Path
+
+import mlflow
+import yaml
+
+from mlflow_utils import end_run, start_run
+from ultralytics import YOLO
 
 
-def main():
-    # Path to your dataset
-    data_yaml = os.path.join(os.path.dirname(__file__), "data", "data.yaml")
+def flatten_config(config: dict, prefix: str = "") -> dict[str, str]:
+    flat: dict[str, str] = {}
+    for key, value in config.items():
+        full_key = f"{prefix}{key}" if prefix else key
+        if isinstance(value, dict):
+            flat.update(flatten_config(value, prefix=f"{full_key}."))
+        elif isinstance(value, list):
+            flat[full_key] = ",".join(str(item) for item in value)
+        else:
+            flat[full_key] = str(value)
+    return flat
 
-    # Create YOLOv12 model instance
-    model = YOLO("yolov12n-cls.pt")
 
-    # Ensure the output directory exists
-    output_dir = os.path.join(os.path.dirname(__file__), "runs", "train")
-    os.makedirs(output_dir, exist_ok=True)
+def run(config_path: str = "config.yaml") -> None:
+    config_dir = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.isabs(config_path):
+        config_path = os.path.join(config_dir, config_path)
 
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+
+    model_cfg = config["model"]
+    train_cfg = config["training"]
+    mlflow_cfg = config["mlflow"]
+    data_dir = config["data"]["dir"]
+
+    if not os.path.isabs(data_dir):
+        data_dir = os.path.join(os.path.dirname(config_path), data_dir)
+    data_yaml = os.path.join(data_dir, "data.yaml")
     if not os.path.exists(data_yaml):
-        raise FileNotFoundError(f"Dataset YAML file not found: {data_yaml}")
-    else:
-        with open(data_yaml, "r") as yaml_file:
-            print(f"Found dataset YAML file at {data_yaml}:\n")
-            print(yaml_file.read())
+        raise FileNotFoundError(f"Dataset YAML not found: {data_yaml}")
+
+    start_run(
+        experiment_name=mlflow_cfg["experiment_name"],
+        run_name=f"train-{Path(model_cfg['weights']).stem}",
+        params=flatten_config(config),
+    )
+
+    model = YOLO(model_cfg["weights"])
+
+    def _log_metrics(trainer) -> None:
+        metrics = {
+            key.replace("(", "_").replace(")", ""): float(value)
+            for key, value in trainer.metrics.items()
+            if isinstance(value, (int, float))
+        }
+        mlflow.log_metrics(metrics, step=trainer.epoch)
+
+    model.add_callback("on_fit_epoch_end", _log_metrics)
 
     try:
-        # Train the model
         model.train(
             data=data_yaml,
-            epochs=100,
-            imgsz=640,
-            batch=16,
-            project=output_dir,
-            name="yolov12n-custom",
+            epochs=train_cfg["epochs"],
+            imgsz=model_cfg["imgsz"],
+            batch=train_cfg["batch"],
+            device=train_cfg["device"],
+            name=train_cfg["name"],
             task="detect",
         )
-    except Exception as e:
-        print(f"An error occurred during training: {e}")
-    # # Save the trained model
-    # model.export(format='pt', imgsz=640)
-    # model.save(os.path.join(output_dir, 'yolov12n-custom.pt')))
+    finally:
+        end_run()
+
+
+def main() -> None:
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
+    run(config_path)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"Unhandled exception: {e}")
+    main()

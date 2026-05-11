@@ -1,47 +1,113 @@
 # molecular-dynamics-simulation
-This project uses LAMMPS to simulate molecular dynamics.
 
-## Linux Setup
-[Install](https://docs.lammps.org/Install.html) and [Build](https://docs.lammps.org/Build.html) LAMMPS.
+A two-pillar project combining LAMMPS-based molecular dynamics simulation with computer-vision particle tracking for microscopy data.
 
-### Temporary Environment Variable Setup
-Use the following to set up env variables in the commandline to run the ```lmp``` command (first navigate to the directory of the executable):
+## Repository Structure
 
 ```
-EXECUTABLE_DIR=$PWD
+.
+├── simulation/                  # Physics simulation and analysis
+│   ├── lammps/
+│   │   ├── inputs/              # LAMMPS .in configuration files
+│   │   └── scripts/             # run.py / run.sh execution wrappers
+│   ├── analysis/                # Hexatic order, phase diagrams, velocity/temp graphs
+│   ├── processing/              # Trajectory and image post-processing
+│   └── outputs/                 # Simulation results and logs (gitignored)
+│
+└── particle_tracking/           # Computer-vision detection and tracking
+    ├── data/
+    │   ├── raw/                 # Source microscopy frames
+    │   ├── processing/          # Frame extraction and augmentation preview
+    │   └── labeling/            # Auto-labelers (LodeSTAR, trackpy, YOLO)
+    ├── models/
+    │   ├── rf_detr/             # RF-DETR detection model
+    │   ├── yolov12/             # YOLOv12 detection model
+    │   ├── train_lodestar.py    # LodeSTAR training entry point
+    │   ├── train_yolo.py        # YOLO training entry point
+    │   └── weights/             # Pretrained model weights
+    ├── tracking/
+    │   ├── track.py             # Main tracking entry point
+    │   └── configs/             # Tracking configuration YAML files
+    └── evaluation/              # Results, MLflow DB, Lightning logs
 ```
 
+## Setup
+
+### Python Dependencies
+
+```bash
+pip install -r simulation/requirements.txt
+# or, with uv:
+uv pip install -r simulation/requirements.txt
 ```
+
+### LAMMPS
+
+[Install](https://docs.lammps.org/Install.html) and [build](https://docs.lammps.org/Build.html) LAMMPS, then add the executable to your `PATH`.
+
+**Temporary (current session):**
+```bash
+EXECUTABLE_DIR=$PWD   # run from the directory containing the lmp executable
 export PATH=$EXECUTABLE_DIR:$PATH
 ```
 
-### Bash Shell Environment Variable Setup
-Add the following to the ```~/.bashrc``` file (replace ```/path/to/dir``` with the path to the directory of the executable):
-
-```
-export PATH=/path/to/dir:$PATH
+**Permanent (add to `~/.bashrc`):**
+```bash
+export PATH=/path/to/lammps/bin:$PATH
 ```
 
-#### Setup Ovito
+> **Note (Linux < 22.04):** OVITO may require `libxcb-cursor0` if `qt.qpa.plugin 6.5.0` is unavailable.
 
-If on an old Linux Ubuntu version less than 22.04 that does not have ```qt.qpa.plugin 6.5.0``` may need to install ```libxcb-cursor0```
+### Pre-commit Hooks
 
-## Docker Setup (Work in progress)
-[Install](https://www.docker.com/get-started/) Docker.
-
-Pull docker image:
+```bash
+pre-commit install
 ```
-docker pull ankhoa1212/lammps-simulations:latest
+
+## Usage
+
+### Running a Simulation
+
+```bash
+python simulation/lammps/scripts/run.py simulation/lammps/inputs/<config>.in
+```
+
+### Particle Tracking
+
+```bash
+python particle_tracking/tracking/track.py \
+    --source <path/to/frames> \
+    --weights <path/to/weights>
+```
+
+### Training Detection Models
+
+```bash
+# RF-DETR
+cd particle_tracking/models/rf_detr && python train.py
+
+# YOLOv12
+python particle_tracking/models/train_yolo.py
+
+# LodeSTAR
+python particle_tracking/models/train_lodestar.py
+```
+
+### Analysis
+
+```bash
+# Hexatic order parameter
+python simulation/analysis/hexatic_order.py
+
+# Velocity / temperature graphs
+python simulation/analysis/velocity_graph.py
+python simulation/analysis/temp_graph.py
 ```
 
 ## Resources
-- [LAMMPS Manual](https://docs.lammps.org/Manual.html)
-  - [Installation](https://docs.lammps.org/Install.html)
-  - [Examples](https://docs.lammps.org/Examples.html)
-  - [Processing Tools](https://docs.lammps.org/Tools.html)
-  - [Library Interfaces](https://docs.lammps.org/Library.html)
-  - [Modifying and extending LAMMPS](https://docs.lammps.org/Modify.html)
+
+- [LAMMPS Manual](https://docs.lammps.org/Manual.html) — [Install](https://docs.lammps.org/Install.html) · [Examples](https://docs.lammps.org/Examples.html) · [Tools](https://docs.lammps.org/Tools.html)
+- [OVITO](https://www.ovito.org/) — visualization of simulation trajectories
 - [Light-Responsive Assembly](https://pubs.acs.org/doi/10.1021/acs.jpcb.4c02301)
-- [Molecular Dynamics Simulation of Active Particles Video](https://www.youtube.com/watch?v=wsM2kUB6XU4&ab_channel=SoftMatterLab)
-- [Molecular Dynamics Simulation of Active Particles (Brownian Motion)](https://arxiv.org/abs/2102.10399)
-- [OVITO (for Visualization)](https://www.ovito.org/)
+- [MD Simulation of Active Particles (video)](https://www.youtube.com/watch?v=wsM2kUB6XU4&ab_channel=SoftMatterLab)
+- [MD Simulation of Active Particles — Brownian Motion (arXiv)](https://arxiv.org/abs/2102.10399)

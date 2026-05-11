@@ -1,0 +1,20 @@
+# YOLOv12 Training Configuration
+
+# Data preparation
+data_dir: "../data-setup/dataset"    # Directory containing images. Labels are expected in same dir or config as below
+output_dir: "processed_data"         # Where to save the split dataset and data.yaml
+
+# Model configuration
+model: "yolov12n-cls.pt"             # Pre-trained weights to start from
+task: "detect"                       # detect | segment | classify
+
+# Training hyperparameters
+epochs: 100
+batch: 16
+imgsz: 640
+name: "yolov12n-custom"
+
+# Dataset info
+nc: 1
+names:
+  - "particle"

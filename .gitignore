@@ -1,24 +1,29 @@
-log.lammps
-
-venv/
-.venv/
-output/
-*.csv
-data/
+# Python
 **/__pycache__/
-__pycache__/
+.venv/
+venv/
+
+# LAMMPS
+log.lammps
 *.log
 *.lammpstrj
-**/yolo_dataset/
+
+# Simulation outputs
+simulation/outputs/
+
+# Data files
+*.csv
 *.tif
 *.tiff
 
-# rf-detr
-rf-detr/mlruns/
-rf-detr/checkpoints/
-rf-detr/*.pth
-rf-detr/split/
+# Particle tracking — model artifacts
+particle_tracking/models/rf_detr/mlruns/
+particle_tracking/models/rf_detr/checkpoints/
+particle_tracking/models/rf_detr/*.pth
+particle_tracking/models/rf_detr/split/
+particle_tracking/models/yolov12/runs/
+**/yolo_dataset/
 
-# data-setup
-data-setup/mlruns/
-data-setup/lightning_logs/
+# Particle tracking — evaluation logs
+particle_tracking/evaluation/lightning_logs/
+particle_tracking/evaluation/runs/

@@ -1,3 +1,3 @@
-[submodule "yolov12/yolov12"]
-	path = yolov12/yolov12
+[submodule "particle_tracking/models/yolov12/yolov12"]
+	path = particle_tracking/models/yolov12/yolov12
 	url = https://github.com/sunsmarterjie/yolov12

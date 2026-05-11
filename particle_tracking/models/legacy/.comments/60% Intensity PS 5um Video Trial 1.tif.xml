@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<comment version="3.0">
+  <caption/>
+  <note>ImageJ=1.51s
+frames=300
+hyperstack=true
+unit=um
+mode=gray
+min=362
+max=4095
+</note>
+  <place/>
+  <categories/>
+</comment>

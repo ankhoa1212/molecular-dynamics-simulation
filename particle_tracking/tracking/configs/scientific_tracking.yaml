@@ -1,0 +1,13 @@
+# Scientific Particle Tracking Configuration
+model_type: "lodestar"
+checkpoint: "path/to/lodestar_model.pt"
+device: "cuda"
+
+tracker: "trackpy"
+search_range: 15.0
+memory: 3
+stub_filter: 5
+
+threshold: 0.5
+save_video: true
+output_dir: "results/scientific_run"

@@ -43,6 +43,8 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from typing import Optional
 
+import shutil
+
 import cv2
 import numpy as np
 from PIL import Image, ImageTk
@@ -151,6 +153,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         self._fixed_size: Optional[int] = None
         self._rect_cross_v_id: Optional[int] = None
         self._rect_cross_h_id: Optional[int] = None
+        self._fixed_preview_id: Optional[int] = None
 
         # ── Edit mode state ──────────────────────────────────────────────────
         self._edit_mode: bool = False
@@ -815,7 +818,7 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         # Normalize exotic bit-depths to uint8
         if img.mode not in ("RGB", "RGBA", "L", "P"):
             arr = np.array(img).astype(float)
-            arr_ptp = arr.ptp()
+            arr_ptp = arr.max() - arr.min()
             arr = ((arr - arr.min()) / (arr_ptp if arr_ptp else 1) * 255).astype("uint8")
             img = Image.fromarray(arr)
 
@@ -888,8 +891,6 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
         self.pan_y = 0.0
 
         # Redraw
-        self._fit_to_canvas()
-
         self._fit_to_canvas()
 
         # Update toolbar
@@ -1027,10 +1028,9 @@ class CropTool:  # pylint: disable=too-many-instance-attributes
 
         # 2. Count images with labels
         exported_count = 0
-        import shutil
 
         # Scan all images in the folder
-        for img_path in tqdm(self.image_paths, desc="Exporting Dataset"):
+        for img_path in self.image_paths:
             stem = img_path.stem
             # We assume labels are in our standard labels/ directory
             src_lbl = self.labels_dir / f"{stem}.txt" if self.labels_dir else None
@@ -1430,9 +1430,11 @@ names:
             self.canvas.delete(self._rect_id)
             self._rect_id = None
 
-        # Clamp to image bounds and normalize (ensure top-left < bottom-right)
-        img_x0, img_y0 = self._clamp_to_image(img_x0, img_y0)
-        img_x1, img_y1 = self._clamp_to_image(img_x1, img_y1)
+        # Convert canvas coords to image coords, then clamp to image bounds
+        img_x0_raw, img_y0_raw = self._canvas_to_image(float(x0c), float(y0c))
+        img_x1_raw, img_y1_raw = self._canvas_to_image(float(event.x), float(event.y))
+        img_x0, img_y0 = self._clamp_to_image(img_x0_raw, img_y0_raw)
+        img_x1, img_y1 = self._clamp_to_image(img_x1_raw, img_y1_raw)
 
         # If in fixed mode, center the fixed box on the click start (or end)
         if self._fixed_size:

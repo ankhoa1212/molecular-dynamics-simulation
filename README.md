@@ -20,14 +20,17 @@ End-to-end pipeline for running molecular dynamics simulations, auto-labeling mi
 molecular-dynamics-simulation/
 ├── lammps-scripts/          # LAMMPS simulation scripts and analysis tools
 ├── data-setup/              # LodeSTAR auto-labeling pipeline (generates YOLO labels)
-├── rf-detr/                 # RF-DETR particle detection model (training & evaluation)
-├── yolov12/                 # YOLOv12 particle detection model (alternative)
-└── particle-tracking/       # Particle tracking using a trained detection model
+├── rf-detr/                 # RF-DETR training, evaluation, weights, and venv
+│   ├── checkpoints/         # Trained RF-DETR checkpoints
+│   ├── rf-detr-base.pth     # Pretrained base weights
+│   └── rf-detr-large-2026.pth
+├── yolov12/                 # YOLOv12 training, evaluation, and weights
+│   ├── runs/detect/train/weights/best.pt
+│   └── processed_data/      # Train/validation image splits
+└── particle-tracking/       # Particle tracking pipeline
     ├── track.py             # Unified tracker (RF-DETR, YOLOv12, or LodeSTAR)
-    ├── config.yaml          # Tracking configuration (model, input, output, tracker)
-    ├── models/
-    │   ├── rf_detr/         # RF-DETR weights and local venv
-    │   └── yolov12/         # YOLOv12 weights
+    ├── config.yaml          # Tracking configuration
+    ├── models/legacy/       # Archived YOLOv5/YOLOv11 experiments
     ├── data/raw/            # Raw input TIFF files
     └── evaluation/results/  # Tracking outputs (tracks.csv, annotated video)
 ```
@@ -145,6 +148,10 @@ cd rf-detr
 uv sync
 ```
 
+This installs all dependencies into `rf-detr/.venv`, including the `rfdetr` package that `particle-tracking/track.py` loads at runtime for inference.
+
+Pretrained weights (`rf-detr-base.pth`, `rf-detr-large-2026.pth`) and trained checkpoints (`checkpoints/`) are stored here alongside the training code.
+
 **Dataset format:** A directory with `images/` and a single `annotations.json` in COCO format. Edit `config.yaml` to set the dataset path and assign experiment names to train/val/test splits.
 
 **Train:**
@@ -182,105 +189,26 @@ See [`rf-detr/README.md`](rf-detr/README.md) for full configuration options.
 
 ### 4. Particle Tracking (`particle-tracking/`)
 
-Runs a trained detection model (RF-DETR, YOLOv12, or LodeSTAR) on video or image sequences and links detections into particle tracks.
-
-**Input:** video file, folder of PNG/TIFF frames, or multi-page TIFF stack.
+Runs a detection model (RF-DETR, YOLOv12, or LodeSTAR) on microscopy data and links detections into tracks. Also accepts `.lammpstrj` LAMMPS trajectories directly, bypassing detection and using atom IDs as track IDs.
 
 **Output:** `tracks.csv` with per-frame `(track_id, x, y, w, h, conf)` and optionally an annotated `.mp4`.
 
-**Setup:**
-
-The RF-DETR backend uses its own virtualenv. Install it once:
-
-```bash
-cd particle-tracking/models/rf_detr
-uv sync
-```
-
-For all other dependencies (YOLO, LodeSTAR, supervision, trackpy):
-
-```bash
-pip install pyyaml opencv-python numpy pandas tifffile pillow tqdm supervision trackpy ultralytics deeplay deeptrack
-```
-
-**Configuration:**
-
-Edit `particle-tracking/config.yaml` to set your model, input, and tracking parameters. All paths in the config are relative to the `particle-tracking/` directory.
-
-```yaml
-input: data/raw/your_video.tif
-
-model:
-  type: rf-detr          # rf-detr | yolo | lodestar
-  checkpoint: models/rf_detr/checkpoints/checkpoint_best_ema.pth
-  variant: large         # rf-detr only: nano | small | medium | large
-  device: "0"
-
-detection:
-  threshold: 0.25
-
-tracking:
-  tracker: trackpy       # trackpy (default) | bytetrack
-  search_range: 10.0
-  memory: 3
-  stub_filter: 5
-
-output:
-  dir: evaluation/results/tracking_output
-  save_video: false
-  fps: 30
-```
-
-**Usage:**
-
-Run with defaults from the config file:
+**Quick start:**
 
 ```bash
 cd particle-tracking
-python track.py
+uv sync                          # install dependencies
+# edit config.yaml to set your input and model, then:
+uv run python track.py
 ```
 
-Override any config value on the command line:
+The RF-DETR backend requires its own one-time install (run from the repo root):
 
 ```bash
-# RF-DETR with a specific checkpoint
-python track.py \
-  --model-type rf-detr \
-  --checkpoint models/rf_detr/checkpoints/checkpoint_best_ema.pth \
-  --input data/raw/trial1.tif \
-  --save-video
-
-# YOLOv12
-python track.py \
-  --model-type yolo \
-  --checkpoint models/yolov12/runs/detect/train/weights/best.pt \
-  --input data/raw/trial1.tif
-
-# LodeSTAR (uses the auto-labeling model directly — no separate training step)
-python track.py \
-  --model-type lodestar \
-  --checkpoint ../data-setup/models/lodestar_model_15/model.pt \
-  --input data/raw/trial1.tif
+cd rf-detr && uv sync
 ```
 
-**CLI reference:**
-
-| Argument | Config key | Default | Description |
-|---|---|---|---|
-| `--config` | — | `config.yaml` | Path to YAML config file |
-| `--model-type` | `model.type` | `rf-detr` | `rf-detr`, `yolo`, or `lodestar` |
-| `--checkpoint` | `model.checkpoint` | best EMA checkpoint | Path to model weights |
-| `--variant` | `model.variant` | `large` | RF-DETR size: `nano`, `small`, `medium`, `large` |
-| `--device` | `model.device` | `0` | Inference device (`0` for GPU, `cpu`) |
-| `--threshold` | `detection.threshold` | `0.25` | Detection confidence threshold |
-| `--input` | `input` | — | Video, image folder, or TIFF stack |
-| `--output-dir` | `output.dir` | `evaluation/results/tracking_output` | Where to write results |
-| `--tracker` | `tracking.tracker` | `trackpy` | `trackpy` (offline) or `bytetrack` (online) |
-| `--search-range` | `tracking.search_range` | `10.0` | Trackpy: max pixel distance between frames |
-| `--memory` | `tracking.memory` | `3` | Trackpy: frames a particle may be missing |
-| `--stub-filter` | `tracking.stub_filter` | `5` | Trackpy: min track length to keep |
-| `--save-video` | `output.save_video` | off | Save annotated `.mp4` |
-| `--fps` | `output.fps` | `30` | FPS for output video |
+See [`particle-tracking/README.md`](particle-tracking/README.md) for the full setup guide, configuration reference, and CLI options.
 
 ---
 

@@ -66,14 +66,18 @@ def main() -> None:
         log_epoch_metrics(metrics, step=trainer.epoch)
 
     variant = model_cfg["variant"].lower()
+    model_kwargs = {}
+    if "num_queries" in model_cfg:
+        model_kwargs["num_queries"] = model_cfg["num_queries"]
+
     if variant == "base":
         from rfdetr import RFDETRBase
 
-        model = RFDETRBase()
+        model = RFDETRBase(**model_kwargs)
     elif variant == "large":
         from rfdetr import RFDETRLarge
 
-        model = RFDETRLarge()
+        model = RFDETRLarge(**model_kwargs)
     else:
         raise ValueError(f"Unknown model variant {variant!r}. Choose 'base' or 'large'.")
 
@@ -90,6 +94,10 @@ def main() -> None:
         pin_memory=train_cfg.get("pin_memory", False),
         output_dir=str(checkpoint_dir),
         callbacks=callbacks,
+        early_stopping=train_cfg.get("early_stopping", False),
+        early_stopping_patience=train_cfg.get("early_stopping_patience", 10),
+        early_stopping_min_delta=train_cfg.get("early_stopping_min_delta", 0.001),
+        early_stopping_use_ema=train_cfg.get("early_stopping_use_ema", False),
     )
 
     for ckpt in sorted(checkpoint_dir.glob("*.pth")):

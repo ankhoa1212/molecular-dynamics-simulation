@@ -8,6 +8,7 @@ import argparse
 import freud
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from lammps_parser import parse_lammps_dump
 
@@ -70,6 +71,39 @@ def parse_and_calc_hexatic(filename, verbose=1):
             print(f"Step {step}: Avg |psi6| = {mean_psi6:.4f}")
 
     return steps, psi6_means
+
+
+def calc_hexatic_from_tracks(df, frame_width, frame_height, verbose=1):
+    """Calculate hexatic order per frame from a particle tracking DataFrame.
+
+    Args:
+        df: DataFrame with columns frame, x, y (from tracks.csv)
+        frame_width: Image width in pixels — used as freud box Lx
+        frame_height: Image height in pixels — used as freud box Ly
+        verbose: print per-frame values when 1
+
+    Returns:
+        tuple: (frames, psi6_means) — parallel lists, same signature as parse_and_calc_hexatic
+    """
+    box = freud.Box(Lx=frame_width, Ly=frame_height, is2D=True)
+    frames_out, psi6_means = [], []
+
+    for frame_idx, group in df.groupby("frame"):
+        positions = group[["x", "y"]].to_numpy()
+        if len(positions) < 6:
+            continue
+        positions_3d = np.column_stack((positions, np.zeros(len(positions))))
+
+        hexatic = freud.order.Hexatic(k=6)
+        hexatic.compute(system=(box, positions_3d), neighbors={"num_neighbors": 6})
+        mean_psi6 = float(np.mean(np.abs(hexatic.particle_order)))
+
+        frames_out.append(int(frame_idx))
+        psi6_means.append(mean_psi6)
+        if verbose:
+            print(f"Frame {frame_idx}: Avg |psi6| = {mean_psi6:.4f}")
+
+    return frames_out, psi6_means
 
 
 def main():

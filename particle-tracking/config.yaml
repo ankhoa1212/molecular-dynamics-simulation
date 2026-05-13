@@ -42,7 +42,7 @@ tracking:
   memory: 5
 
   # Trackpy: discard tracks shorter than this many frames (0 = keep all)
-  stub_filter: 60
+  stub_filter: 90
 
   # Trackpy: use adaptive search in dense scenes (reduces search_range if too many candidates)
   adaptive_stop: 5.0  # minimum search_range before giving up (set to null to disable)
